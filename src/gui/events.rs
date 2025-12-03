@@ -340,7 +340,7 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                     Err( e ) =>
                     {
                         if message_box( "Error", 
-                        format!( "Failed to save changes to plugin.\nError Code {}", e ).as_str(), 
+                        format!( "Failed to save changes to plugin.\nReason:{}", e ).as_str(),
                         MessageButtons::RetryCancel, 
                         MessageIcons::Error ) == MessageChoice::Cancel
                         {
@@ -374,7 +374,7 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                             Err( e ) =>
                             {
                                 message_box( "Error",
-                                format!( "Failed to save changes to plugin.\nError Code {}", e ).as_str(),
+                                format!( "Failed to save changes.\nReason:{}", e ).as_str(),
                                 MessageButtons::Ok,
                                 MessageIcons::Error );
                             }

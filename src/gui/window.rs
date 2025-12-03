@@ -107,7 +107,8 @@ pub fn show_wait_splash() -> nwg::Window
         .size( ( 200, 0 ) )
         .position( ( nwg::Monitor::width() / 2 - 150, nwg::Monitor::height() / 2 - 50 ) )
         .title( "Initial setup, please wait..." ) // no title bar text
-        .flags(
+        .flags
+        (
             nwg::WindowFlags::WINDOW
             | nwg::WindowFlags::VISIBLE
             | nwg::WindowFlags::POPUP, // no system menu, no buttons

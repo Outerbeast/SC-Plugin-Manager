@@ -79,8 +79,26 @@ fn write_store(st: &Config) -> Result<(), io::Error>
     
     Ok(())
 }
-/// Initialise: check TOML, otherwise discover svencoop.exe and seed plugin files.
-/// Returns the svencoop folder path.
+// Last ditch effort to get the path, assuming user installed the app alongside default_plugins.txt
+pub fn failover() -> Option<PathBuf>
+{   // Get the full path to the running exe
+    let exe_path = env::current_exe().ok()?;
+    // Get its parent directory
+    let exe_dir = exe_path.parent()?;
+    // Build the failover path: exe_dir + FILENAME_PLUGINS
+    let failover_path = exe_dir.join( crate::plugin::FILENAME_PLUGINS );
+    //println!("Using failover path: '{}'", failover_path.display());
+    if failover_path.is_file()
+    {
+        Some( failover_path )
+    }
+    else
+    {
+        None
+    }
+}
+// Initialise: check TOML, otherwise discover svencoop.exe and seed plugin files.
+// Returns the svencoop folder path.
 pub fn init() -> io::Result<PathBuf>
 {
     if let Ok( store ) = read_store()
@@ -93,13 +111,16 @@ pub fn init() -> io::Result<PathBuf>
     // Case 2: discover svencoop.exe
     let splash = crate::gui::window::show_wait_splash();
     let exe_path = crate::utils::search_drives( "svencoop.exe" );
-
-    if !exe_path.exists()
+    splash.close();
+    let svencoop_dir =
+    if exe_path.exists()
     {
-        return Err( io::Error::new( io::ErrorKind::NotFound, "svencoop.exe not found" ) );
+        exe_path.with_file_name( "svencoop" )
     }
-
-    let svencoop_dir = exe_path.with_file_name( "svencoop" );
+    else
+    {   // Last resort: look for default plugins file next to the application
+        failover().ok_or_else( || io::Error::new( io::ErrorKind::NotFound, "svencoop.exe not found" ) )?
+    };
     // Ensure plugin files exist
     let enabled_file = svencoop_dir.join( crate::plugin::FILENAME_PLUGINS );
     let disabled_file = svencoop_dir.join( crate::plugin::FILENAME_DISABLED_PLUGINS );
@@ -117,8 +138,6 @@ pub fn init() -> io::Result<PathBuf>
     let mut store = Config::default();
     store.svencoopdir = Some( svencoop_dir.to_string_lossy().into_owned() );
     let _ = write_store( &store );
-
-    splash.close();
 
     Ok( svencoop_dir )
 }

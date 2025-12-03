@@ -151,14 +151,13 @@ impl PluginEntry
             .join( "scripts" )
             .join( "plugins" )
             .join( src.file_name().unwrap_or_default() );
-
         // Ensure the destination directory exists
-        if let Some(parent) = dst.parent()
+        if let Some( parent ) = dst.parent()
         {
-            fs::create_dir_all(parent)?;
+            fs::create_dir_all( parent )?;
         }
         // Copy the file
-        fs::copy(&src, &dst)?;
+        fs::copy( &src, &dst )?;
 
         Ok(())
     }
@@ -187,7 +186,7 @@ impl PluginEntry
             .replace( "<NAME>", &self.name )
             .replace( "<SCRIPT>", &self.script )
             .replace( "<CONCOMMANDNS>", &self.concommandns )
-            .replace( "<ADMINLEVEL>", &(self.adminlevel as i32).to_string() )
+            .replace( "<ADMINLEVEL>", &( self.adminlevel as i32 ).to_string() )
             .replace( "<MAPSINCLUDED>", &self.maps_included.join( ";" ) )
             .replace( "<MAPSEXCLUDED>", &self.maps_excluded.join( ";" ) );
 
@@ -206,7 +205,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
     {
         let line = lines[i].trim();
 
-        if line.starts_with("\"plugin\"")
+        if line.starts_with( "\"plugin\"" )
         {
             let mut name = String::new();// This field may not be necessary given this is being shoved into a hashmap where the plugin name is the key
             let mut script = String::new();
@@ -216,24 +215,24 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             let start = i;
             i += 1; // move past "plugin"
 
-            while i < lines.len() && !lines[i].trim().starts_with('}')
+            while i < lines.len() && !lines[i].trim().starts_with( '}' )
             {
                 let inner_line = lines[i].trim();
-                if inner_line.starts_with("\"name\"") 
+                if inner_line.starts_with( "\"name\"" ) 
                 {
-                    name = inner_line.split('"').nth(3).unwrap_or("").to_string();
+                    name = inner_line.split( '"' ).nth( 3 ).unwrap_or("").to_string();
                 } 
-                else if inner_line.starts_with("\"script\"") 
+                else if inner_line.starts_with( "\"script\"" ) 
                 {
-                    script = inner_line.split('"').nth(3).unwrap_or("").to_string();
+                    script = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
                 } 
-                else if inner_line.starts_with("\"concommandns\"") 
+                else if inner_line.starts_with( "\"concommandns\"" ) 
                 {
-                    concommandns = inner_line.split('"').nth(3).unwrap_or("").to_string();
+                    concommandns = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
                 }
-                else if inner_line.starts_with("\"adminlevel\"") 
+                else if inner_line.starts_with( "\"adminlevel\"" ) 
                 {
-                    let level_str = inner_line.split('"').nth(3).unwrap_or("0");
+                    let level_str = inner_line.split( '"' ).nth( 3 ).unwrap_or( "0" );
                     adminlevel = AdminLevel::from_i32( level_str.parse::<i32>().unwrap_or( 0 ) );
                 }
 
@@ -245,7 +244,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             let key =
             if name.is_empty() 
             {
-                let k = format!("__unnamed_{}", unnamed_counter);
+                let k = format!( "__unnamed_{}", unnamed_counter );
                 unnamed_counter += 1;
                 k
             } 
@@ -276,7 +275,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
     plugins
 }
 
-pub fn save_plugins(plugins: &HashMap<String, PluginEntry>) -> Result<(), Box<dyn std::error::Error>>
+pub fn save_plugins(plugins: &HashMap<String, PluginEntry>) -> Result<(), io::Error>
 {
     let mut enabled_plugins = String::new();
     let mut disabled_plugins = String::new();
@@ -285,23 +284,24 @@ pub fn save_plugins(plugins: &HashMap<String, PluginEntry>) -> Result<(), Box<dy
     {
         match plugin.state
         {
-            PluginState::Enabled => enabled_plugins.push_str(&plugin.write_plugin()),
-            PluginState::Disabled => disabled_plugins.push_str(&plugin.write_plugin()),
+            PluginState::Enabled => enabled_plugins.push_str( &plugin.write_plugin() ),
+            PluginState::Disabled => disabled_plugins.push_str( &plugin.write_plugin() ),
             PluginState::Removed => (),// ignore removed plugins
         }
     }
 
     let store = crate::config::read_store()?;
+
     let path = 
     match store.svencoopdir
     {
         Some( dir ) => PathBuf::from( dir ),
-        None => return Err( Box::new( io::Error::new( io::ErrorKind::NotFound, "svencoopdir not configured" ) ) ),
+        //None => return Err( io::Error::new( io::ErrorKind::NotFound, "svencoopdir not configured" ) ),
+        None => std::env::current_exe().unwrap_or_default(),
     };
 
-
-    fs::write( path.join( FILENAME_PLUGINS ), format!("\"plugins\"\n{{\n{}}}\n", enabled_plugins), )?;
-    fs::write( path.join( FILENAME_DISABLED_PLUGINS ),format!("\"disabled_plugins\"\n{{\n{}}}\n", disabled_plugins), )?;
+    fs::write( path.join( FILENAME_PLUGINS ), format!( "\"plugins\"\n{{\n{}}}\n", enabled_plugins), )?;
+    fs::write( path.join( FILENAME_DISABLED_PLUGINS ),format!( "\"disabled_plugins\"\n{{\n{}}}\n", disabled_plugins), )?;
 
     Ok( () )
 }

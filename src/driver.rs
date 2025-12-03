@@ -30,10 +30,7 @@ use native_windows_gui::
 
 use crate::
 {
-    config,
-    gui,
-    utils::open_file,
-    plugin::{ self, * }
+    APPNAME, config, gui, plugin::{ self, * }, utils::open_file
 };
 
 pub fn run() -> Result<(), io::Error>
@@ -49,7 +46,8 @@ pub fn run() -> Result<(), io::Error>
         Err( e ) =>
         {
             gui::window::message_box( "Sven Co-op install Not Found",
-                format!( "Could not find a valid Sven Co-op installation.\nReason:\n{}", e ).as_str(), 
+                format!( "Could not find a valid Sven Co-op installation.
+                    \nReason:\n{}\n\nTry installing {} directly to 'Sven Co-op\\svencoop' and try again", e, APPNAME ).as_str(), 
                 MessageButtons::Ok,
                 MessageIcons::Error );
 
@@ -81,7 +79,12 @@ pub fn run() -> Result<(), io::Error>
             }
 
             Err( e ) =>
-            {
+            {   // It doesn't exist since we haven't created it yet.
+                if path.ends_with( FILENAME_DISABLED_PLUGINS )
+                {
+                    break;
+                }
+
                 gui::window::message_box(
                     "Error reading plugin file",
                     &format!( "The plugin file in '{}' could not be opened.\nReason:\n{}", path.display(), e ),
