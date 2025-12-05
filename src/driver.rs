@@ -30,7 +30,11 @@ use native_windows_gui::
 
 use crate::
 {
-    APPNAME, config, gui, plugin::{ self, * }, utils::open_file
+    APPNAME,
+    config,
+    gui,
+    plugin::{ self, * },
+    utils::open_file
 };
 
 pub fn run() -> Result<(), io::Error>
@@ -47,7 +51,7 @@ pub fn run() -> Result<(), io::Error>
         {
             gui::window::message_box( "Sven Co-op install Not Found",
                 format!( "Could not find a valid Sven Co-op installation.
-                    \nReason:\n{}\n\nTry installing {} directly to 'Sven Co-op\\svencoop' and try again", e, APPNAME ).as_str(), 
+                    \nReason:\n{}\n\nTry installing {} directly to 'Sven Co-op\\svencoop' and try again.", e, APPNAME ).as_str(), 
                 MessageButtons::Ok,
                 MessageIcons::Error );
 

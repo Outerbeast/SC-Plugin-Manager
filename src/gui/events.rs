@@ -86,8 +86,9 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                             _ => Some( 0 ),
                         });
 
-                        gui.txt_maps_included.set_text( &selected_plugin.maps_included.join( "\n" ) );
-                        gui.txt_maps_excluded.set_text( &selected_plugin.maps_excluded.join( "\n" ) );
+                        gui.txt_maps_included.set_text( &selected_plugin.maps_included );
+                        gui.txt_maps_excluded.set_text( &selected_plugin.maps_excluded );
+
                         gui.chk_enabled.set_check_state(
                         match selected_plugin.state
                         {
@@ -291,35 +292,82 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
             // Apply button clicked
             Event::OnButtonClick
             if handle == gui.btn_apply.handle =>
-            {   // Apply changes to selected plugin
-                let Some( selected_name ) = gui.lst_plugins.selection_string()
+            {   // Get visible selection and strip checkmark prefix
+                let Some( raw_selected ) = gui.lst_plugins.selection_string()
                 else
-                {   // None selected
-                    message_box( "No Plugin Selected", 
-                    "Please select a plugin from the list to apply changes.", 
-                    MessageButtons::Ok, 
+                {
+                    message_box( "No Plugin Selected",
+                    "Please select a plugin from the list to apply changes.",
+                    MessageButtons::Ok,
                     MessageIcons::Warning );
 
                     return;
                 };
 
-                let mut plugins_ref = gui.plugins.borrow_mut();
-                if let Some( selected_plugin ) = plugins_ref.get_mut( selected_name.as_str() )
+                let selected_name = raw_selected
+                    .trim_start_matches( CHECKED )
+                    .trim_start_matches( UNCHECKED )
+                    .trim_start()
+                .to_string();
+                // Mutate the plugin entry; handle rename by removing and reinserting under new key
                 {
-                    selected_plugin.name = gui.txt_name.text();
-                    selected_plugin.script = gui.txt_script.text();
-                    selected_plugin.concommandns = gui.txt_concommandns.text();
-                    selected_plugin.adminlevel =
-                    match gui.cb_adminlevel.selection()
+                    let mut plugins_ref = gui.plugins.borrow_mut();
+                    // If the key doesn't exist, nothing to do
+                    if !plugins_ref.contains_key( selected_name.as_str() )
                     {
-                        Some( 0 ) => AdminLevel::AdminNo,
-                        Some( 1 ) => AdminLevel::AdminYes,
-                        Some( 2 ) => AdminLevel::AdminOwner,
+                        message_box( "Plugin Not Found",
+                        "Selected plugin could not be found in the internal store.",
+                        MessageButtons::Ok,
+                        MessageIcons::Error );
+
+                        return;
+                    }
+                    // Remove the entry so we can safely rename the key if needed
+                    let mut plugin = plugins_ref.remove( selected_name.as_str() ).unwrap();
+                    // Update fields with owned Strings
+                    plugin.name = gui.txt_name.text().to_string();
+                    plugin.script = gui.txt_script.text().to_string();
+                    plugin.concommandns = gui.txt_concommandns.text().to_string();
+
+                    let admin_idx = gui.cb_adminlevel.selection().unwrap_or( 0 );
+                    plugin.adminlevel = match admin_idx
+                    {
+                        0 => AdminLevel::AdminNo,
+                        1 => AdminLevel::AdminYes,
+                        2 => AdminLevel::AdminOwner,
                         _ => AdminLevel::AdminNo,
                     };
 
-                    selected_plugin.maps_included = gui.txt_maps_included.text().lines().map( | s | s.to_string() ).collect();
-                    selected_plugin.maps_excluded = gui.txt_maps_excluded.text().lines().map( | s | s.to_string() ).collect();
+                    plugin.maps_included = gui.txt_maps_included.text().to_string();
+                    plugin.maps_excluded = gui.txt_maps_excluded.text().to_string();
+                    // Reinsert under the (possibly new) key
+                    let new_key = plugin.name.clone();
+                    plugins_ref.insert( new_key, plugin );
+                } // plugins_ref dropped here
+                // Rebuild listbox collection so UI reflects new name and state
+                {
+                    let plugins_ref = gui.plugins.borrow();
+                    let mut rows: Vec<(String, bool)> = plugins_ref
+                        .values()
+                        .map( |p| ( p.name.clone(), p.state == plugin::PluginState::Enabled ) )
+                    .collect();
+
+                    rows.sort_unstable_by_key( |(name, _)| name.to_ascii_lowercase() );
+
+                    let new_collection: Vec<String> = rows
+                        .into_iter()
+                        .map( |( name, enabled )| format!( "{} {}", if enabled { CHECKED } else { UNCHECKED }, name ) )
+                    .collect();
+
+                    gui.lst_plugins.set_collection(new_collection);
+                }
+                // Optionally persist immediately
+                if let Err( e ) = save_plugins( &gui.plugins.borrow() )
+                {
+                    message_box( "Save Error",
+                    &format!( "Failed to save plugins.\nReason: {}", e ),
+                    MessageButtons::Ok,
+                    MessageIcons::Error );
                 }
             }
             // Save button clicked
@@ -354,34 +402,29 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
             if handle == gui.btn_help.handle =>
             {
                 message_box( "Help", 
-                    HELP_INFO, 
-                    MessageButtons::Ok, 
-                    MessageIcons::Question );
+                HELP_INFO, 
+                MessageButtons::Ok, 
+                MessageIcons::Question );
             }
             // Window close event
             Event::OnWindowClose =>
             {
-                match message_box( "Confirm Save",
+                if message_box( "Confirm Save",
                 "Save changes?",
                 MessageButtons::YesNo,
-                MessageIcons::Question )
-                {
-                    MessageChoice::Yes =>
-                    {   // Save plugins
-                        match save_plugins( &gui.plugins.borrow() )
+                MessageIcons::Question ) == MessageChoice::Yes
+                {   // Save plugins
+                    match save_plugins( &gui.plugins.borrow() )
+                    {
+                        Ok( _ ) => { },
+                        Err( e ) =>
                         {
-                            Ok( _ ) => { },
-                            Err( e ) =>
-                            {
-                                message_box( "Error",
-                                format!( "Failed to save changes.\nReason:{}", e ).as_str(),
-                                MessageButtons::Ok,
-                                MessageIcons::Error );
-                            }
+                            message_box( "Error",
+                            format!( "Failed to save changes.\nReason:{}", e ).as_str(),
+                            MessageButtons::Ok,
+                            MessageIcons::Error );
                         }
                     }
-                    // Do nothing and exit
-                    _ => { }
                 }
 
                 stop_thread_dispatch();

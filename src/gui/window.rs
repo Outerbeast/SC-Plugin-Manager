@@ -87,15 +87,13 @@ pub struct MainWindow
 
 pub fn message_box(title: &str, body: &str, buttons: MessageButtons, icons: MessageIcons) -> MessageChoice
 {
-    let choice = message( &MessageParams
+    message( &MessageParams
     {
         title: title,
         content: body,
         buttons: buttons,
         icons: icons,
-    });
-
-    choice
+    })
 }
 
 pub fn show_wait_splash() -> nwg::Window

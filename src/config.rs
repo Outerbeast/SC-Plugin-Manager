@@ -23,6 +23,8 @@ use std::
     path::PathBuf
 };
 
+use crate::gui::window::message_box;
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Config
 {
@@ -53,6 +55,7 @@ fn config_path() -> PathBuf
 pub fn read_store() -> Result<Config, io::Error>
 {
     let p = config_path();
+    
     if !p.exists()
     { 
         return Ok( Config::default() );
@@ -69,7 +72,7 @@ fn write_store(st: &Config) -> Result<(), io::Error>
 {
     fs::create_dir_all( appdata_base() )?;
     let s = toml::to_string_pretty( st )
-        .map_err( |e| io::Error::new( io::ErrorKind::Other, e ) )?;
+        .map_err( |e| io::Error::other( e ) )?;
 
     let p = config_path();
     let tmp = p.with_extension( "toml.tmp" );
@@ -79,49 +82,43 @@ fn write_store(st: &Config) -> Result<(), io::Error>
     
     Ok(())
 }
-// Last ditch effort to get the path, assuming user installed the app alongside default_plugins.txt
-pub fn failover() -> Option<PathBuf>
-{   // Get the full path to the running exe
-    let exe_path = env::current_exe().ok()?;
-    // Get its parent directory
-    let exe_dir = exe_path.parent()?;
-    // Build the failover path: exe_dir + FILENAME_PLUGINS
-    let failover_path = exe_dir.join( crate::plugin::FILENAME_PLUGINS );
-    //println!("Using failover path: '{}'", failover_path.display());
-    if failover_path.is_file()
-    {
-        Some( failover_path )
-    }
-    else
-    {
-        None
-    }
-}
 // Initialise: check TOML, otherwise discover svencoop.exe and seed plugin files.
 // Returns the svencoop folder path.
-pub fn init() -> io::Result<PathBuf>
+fn search_install() -> PathBuf
 {
-    if let Ok( store ) = read_store()
-    {
-        if let Some( dir ) = store.svencoopdir
-        {
-            return Ok( PathBuf::from( dir ) );
-        }
-    }
-    // Case 2: discover svencoop.exe
-    let splash = crate::gui::window::show_wait_splash();
     let exe_path = crate::utils::search_drives( "svencoop.exe" );
-    splash.close();
-    let svencoop_dir =
+
     if exe_path.exists()
     {
         exe_path.with_file_name( "svencoop" )
     }
     else
-    {   // Last resort: look for default plugins file next to the application
-        failover().ok_or_else( || io::Error::new( io::ErrorKind::NotFound, "svencoop.exe not found" ) )?
+    {
+        PathBuf::new()
+    }
+}
+pub fn init() -> io::Result<PathBuf>
+{   // Load config first if its exists
+    if let Ok( store ) = read_store() && let Some( dir ) = store.svencoopdir
+    {
+        return Ok( PathBuf::from( dir ) );
+    }
+    // Initial setup
+    let splash = crate::gui::window::show_wait_splash();
+    let exe_path = env::current_dir().unwrap_or_default();// If the plugin file exists in the current dir, just use that.
+    let svencoop_dir =
+    match exe_path.join( crate::plugin::FILENAME_PLUGINS ).exists()
+    {
+        true => exe_path,
+        false => search_install(),
     };
-    // Ensure plugin files exist
+
+    if !svencoop_dir.exists()
+    {
+        splash.close();
+        return Err( io::Error::new( io::ErrorKind::NotFound, "No directory exists." ) );
+    }
+    // Ensure plugin files exist - redundant for default_plugins.txt if the app was directly installed
     let enabled_file = svencoop_dir.join( crate::plugin::FILENAME_PLUGINS );
     let disabled_file = svencoop_dir.join( crate::plugin::FILENAME_DISABLED_PLUGINS );
 
@@ -135,9 +132,14 @@ pub fn init() -> io::Result<PathBuf>
         fs::write( &disabled_file, b"" )?;
     }
     // Save folder path into TOML
-    let mut store = Config::default();
-    store.svencoopdir = Some( svencoop_dir.to_string_lossy().into_owned() );
-    let _ = write_store( &store );
-
+    if let Err( e ) = write_store( &Config { svencoopdir: Some( svencoop_dir.to_string_lossy().into_owned() ) } )
+    {
+        message_box( "Error",
+            format!( "Failed to save config.\nReason: {}", e ).as_str(),
+            native_windows_gui::MessageButtons::Ok,
+            native_windows_gui::MessageIcons::Error );
+    };
+    
+    splash.close();
     Ok( svencoop_dir )
 }

@@ -28,7 +28,7 @@ use std::
 // Is this function necessary?
 pub fn open_file(path: &str) -> Result<String, std::io::Error>
 {
-    Ok( fs::read_to_string( path )? )
+    fs::read_to_string( path )
 }
 
 pub fn search_drives(file_name: &str) -> PathBuf
@@ -40,7 +40,7 @@ pub fn search_drives(file_name: &str) -> PathBuf
 
     let mut results: Vec<PathBuf> = Vec::new();
 
-    for drive in vec!["A:/", "B:/", "C:/", "D:/", "E:/", "F:/",]
+    for drive in ["A:/", "B:/", "C:/", "D:/", "E:/", "F:/",]
     {
         let root = Path::new( drive );
 

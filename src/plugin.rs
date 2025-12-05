@@ -66,8 +66,8 @@ pub struct PluginEntry
     pub state: PluginState,
     pub concommandns: String,// optional
     pub adminlevel: AdminLevel,// optional
-    pub maps_included: Vec<String>,// optional
-    pub maps_excluded: Vec<String>,// optional
+    pub maps_included: String,// optional
+    pub maps_excluded: String,// optional
     pub start: usize,
     pub end: usize,
 }
@@ -83,8 +83,8 @@ impl PluginEntry
             state: PluginState::Enabled,// If we've just created it, then of course it's enabled
             concommandns: String::new(),
             adminlevel: AdminLevel::AdminNo,
-            maps_included: Vec::new(),
-            maps_excluded: Vec::new(),
+            maps_included: String::new(),
+            maps_excluded: String::new(),
             start: 0,
             end: 0,
         }
@@ -131,8 +131,8 @@ impl PluginEntry
             state: PluginState::Enabled,
             concommandns: String::new(),
             adminlevel: AdminLevel::AdminNo,
-            maps_included: Vec::new(),
-            maps_excluded: Vec::new(),
+            maps_included: String::new(),
+            maps_excluded: String::new(),
             start: 0,
             end: 0,
         };
@@ -182,15 +182,13 @@ impl PluginEntry
         }
         "#;
 
-        let plugin_entry = plugin_format
+        plugin_format
             .replace( "<NAME>", &self.name )
             .replace( "<SCRIPT>", &self.script )
             .replace( "<CONCOMMANDNS>", &self.concommandns )
             .replace( "<ADMINLEVEL>", &( self.adminlevel as i32 ).to_string() )
-            .replace( "<MAPSINCLUDED>", &self.maps_included.join( ";" ) )
-            .replace( "<MAPSEXCLUDED>", &self.maps_excluded.join( ";" ) );
-
-        plugin_entry
+            .replace( "<MAPSINCLUDED>", &self.maps_included )
+            .replace( "<MAPSEXCLUDED>", &self.maps_excluded )
     }
 }
 
@@ -211,6 +209,8 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             let mut script = String::new();
             let mut concommandns = String::new();
             let mut adminlevel = AdminLevel::AdminNo;
+            let mut maps_included = String::new();
+            let mut maps_excluded = String::new();
 
             let start = i;
             i += 1; // move past "plugin"
@@ -220,7 +220,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 let inner_line = lines[i].trim();
                 if inner_line.starts_with( "\"name\"" ) 
                 {
-                    name = inner_line.split( '"' ).nth( 3 ).unwrap_or("").to_string();
+                    name = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
                 } 
                 else if inner_line.starts_with( "\"script\"" ) 
                 {
@@ -234,6 +234,14 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 {
                     let level_str = inner_line.split( '"' ).nth( 3 ).unwrap_or( "0" );
                     adminlevel = AdminLevel::from_i32( level_str.parse::<i32>().unwrap_or( 0 ) );
+                }
+                else if inner_line.starts_with( "\"maps_included\"" )
+                {
+                    maps_included = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
+                }
+                else if inner_line.starts_with( "\"maps_excluded\"" )
+                {
+                    maps_excluded = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
                 }
 
                 i += 1;
@@ -260,8 +268,8 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 state: state.clone(),
                 concommandns,
                 adminlevel,
-                maps_included: Vec::new(),
-                maps_excluded: Vec::new(),
+                maps_included,
+                maps_excluded,
                 start,
                 end,
             };
