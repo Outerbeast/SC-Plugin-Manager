@@ -62,20 +62,18 @@ pub fn read_store() -> Result<Config, io::Error>
     }
 
     let s = fs::read_to_string( p )?;
-    let st: Config = toml::from_str( &s )
-        .map_err( |e| io::Error::new( io::ErrorKind::InvalidData, e ) )?;
-
-    Ok( st )
+    let conf: Config = toml::from_str( &s ).map_err( io::Error::other )?;
+    
+    Ok( conf )
 }
 
 fn write_store(st: &Config) -> Result<(), io::Error>
 {
     fs::create_dir_all( appdata_base() )?;
-    let s = toml::to_string_pretty( st )
-        .map_err( |e| io::Error::other( e ) )?;
 
     let p = config_path();
     let tmp = p.with_extension( "toml.tmp" );
+    let s = toml::to_string_pretty( st ).map_err( io::Error::other )?;
 
     fs::write( &tmp, s.as_bytes() )?;
     fs::rename( &tmp, &p )?;
@@ -97,6 +95,7 @@ fn search_install() -> PathBuf
         PathBuf::new()
     }
 }
+
 pub fn init() -> io::Result<PathBuf>
 {   // Load config first if its exists
     if let Ok( store ) = read_store() && let Some( dir ) = store.svencoopdir

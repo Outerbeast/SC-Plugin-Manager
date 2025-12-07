@@ -20,11 +20,21 @@ use std::
     fs,
     io,
     collections::HashMap,
-    path::PathBuf
+    path::
+    {
+        Path,
+        PathBuf
+    }
 };
 
 pub const FILENAME_PLUGINS: &str = "default_plugins.txt";
 pub const FILENAME_DISABLED_PLUGINS: &str = "disabled_plugins.txt";
+// AdminLevel_t "enum" (actual Rust enums made code unmanageable, hence the choice)
+pub type AdminLevel = i8;
+pub const ADMIN_INIT: AdminLevel  = -1;// (UNUSED) Level on connect, tells functions not to use cached level
+pub const ADMIN_NO: AdminLevel    = 0;// Not an administrator
+pub const ADMIN_YES: AdminLevel   = 1;// Server administrator
+pub const ADMIN_OWNER: AdminLevel = 2;// Server owner (applies to a listenserver host player)
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PluginState
@@ -32,30 +42,6 @@ pub enum PluginState
     Enabled,
     Disabled,
     Removed,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AdminLevel
-{
-    AdminInit = -1,// Level on connect, tells functions not to use cached level
-    AdminNo,// Not an administrator
-    AdminYes,// Server administrator
-    AdminOwner,// Server owner (applies to a listenserver host player)
-}
-
-impl AdminLevel
-{
-    pub fn from_i32(value: i32) -> AdminLevel
-    {
-        match value
-        {
-            -1 => AdminLevel::AdminInit,
-            0 => AdminLevel::AdminNo,
-            1 => AdminLevel::AdminYes,
-            2 => AdminLevel::AdminOwner,
-            _ => AdminLevel::AdminNo,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -82,7 +68,7 @@ impl PluginEntry
             script: script.to_string(),
             state: PluginState::Enabled,// If we've just created it, then of course it's enabled
             concommandns: String::new(),
-            adminlevel: AdminLevel::AdminNo,
+            adminlevel: ADMIN_NO,
             maps_included: String::new(),
             maps_excluded: String::new(),
             start: 0,
@@ -130,7 +116,7 @@ impl PluginEntry
             script: script_trim.to_string(),
             state: PluginState::Enabled,
             concommandns: String::new(),
-            adminlevel: AdminLevel::AdminNo,
+            adminlevel: ADMIN_NO,
             maps_included: String::new(),
             maps_excluded: String::new(),
             start: 0,
@@ -140,7 +126,7 @@ impl PluginEntry
         ( key, plugin )
     }
     // Copies the file to the game install
-    pub fn install_plugin(script: &str, svencoop_dir: &PathBuf) -> io::Result<()>
+    pub fn install_plugin(script: &str, svencoop_dir: &Path) -> io::Result<()>
     {
         let src = PathBuf::from( script );
         // Replace "svencoop" with "svencoop_addon" in the base path
@@ -208,7 +194,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             let mut name = String::new();// This field may not be necessary given this is being shoved into a hashmap where the plugin name is the key
             let mut script = String::new();
             let mut concommandns = String::new();
-            let mut adminlevel = AdminLevel::AdminNo;
+            let mut adminlevel = ADMIN_NO;
             let mut maps_included = String::new();
             let mut maps_excluded = String::new();
 
@@ -218,6 +204,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             while i < lines.len() && !lines[i].trim().starts_with( '}' )
             {
                 let inner_line = lines[i].trim();
+
                 if inner_line.starts_with( "\"name\"" ) 
                 {
                     name = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
@@ -232,8 +219,8 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 }
                 else if inner_line.starts_with( "\"adminlevel\"" ) 
                 {
-                    let level_str = inner_line.split( '"' ).nth( 3 ).unwrap_or( "0" );
-                    adminlevel = AdminLevel::from_i32( level_str.parse::<i32>().unwrap_or( 0 ) );
+                    let level = inner_line.split( '"' ).nth( 3 ).unwrap_or( "0" );
+                    adminlevel = level.parse::<i8>().unwrap_or( 0 );
                 }
                 else if inner_line.starts_with( "\"maps_included\"" )
                 {
@@ -254,6 +241,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             {
                 let k = format!( "__unnamed_{}", unnamed_counter );
                 unnamed_counter += 1;
+
                 k
             } 
             else 
@@ -299,13 +287,11 @@ pub fn save_plugins(plugins: &HashMap<String, PluginEntry>) -> Result<(), io::Er
     }
 
     let store = crate::config::read_store()?;
-
     let path = 
     match store.svencoopdir
     {
         Some( dir ) => PathBuf::from( dir ),
-        //None => return Err( io::Error::new( io::ErrorKind::NotFound, "svencoopdir not configured" ) ),
-        None => std::env::current_exe().unwrap_or_default(),
+        None => std::env::current_dir().unwrap_or_default(),// ??? Theoretically should never happen.
     };
 
     fs::write( path.join( FILENAME_PLUGINS ), format!( "\"plugins\"\n{{\n{}}}\n", enabled_plugins), )?;

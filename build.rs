@@ -23,6 +23,7 @@ fn main() -> io::Result<()>
     if env::var_os( "CARGO_CFG_WINDOWS" ).is_some()
     {
         WindowsResource::new()
+            .set_icon( "icon.ico" )
             .set( "FileDescription", "Sven Co-op Plugin Manager" )
             .set( "ProductName", "SCPluginManager" )
             .set( "FileVersion", "1.0.0" )

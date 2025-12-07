@@ -33,8 +33,8 @@ use crate::plugin::
 
 const WINDOW_TITLE: &str = "Sven Co-op Plugin Manager";
 const WINDOW_SIZE: (i32, i32) = ( 500, 450 );
-const LISTBOX_SIZE: (i32, i32) = ( 150, 360 );
-const LABEL_SIZE: (i32, i32) = ( 100, 30 );
+const LISTBOX_SIZE: (i32, i32) = ( 170, 360 );
+const LABEL_SIZE: (i32, i32) = ( 90, 30 );
 const BUTTON_SIZE: (i32, i32) = ( 85, 30 );
 const TEXTFIELD_SIZE: (i32, i32) = ( 200, 25 );
 
@@ -85,14 +85,14 @@ pub struct MainWindow
     pub plugins: Rc<RefCell<HashMap<String, PluginEntry>>>,
 }
 
-pub fn message_box(title: &str, body: &str, buttons: MessageButtons, icons: MessageIcons) -> MessageChoice
+pub fn message_box(title: &str, content: &str, buttons: MessageButtons, icons: MessageIcons) -> MessageChoice
 {
     message( &MessageParams
     {
-        title: title,
-        content: body,
-        buttons: buttons,
-        icons: icons,
+        title,
+        content,
+        buttons,
+        icons,
     })
 }
 
@@ -171,7 +171,7 @@ pub fn build_main_window(plugins: HashMap<String, PluginEntry>) -> Rc<RefCell<Ma
         Label::builder()
             .text( "Name" )  
             .parent( &app_mut.window )
-            .position( ( 170, 30 ) )
+            .position( ( 190, 35 ) )
             .size( LABEL_SIZE )
         .build( &mut app_mut.lbl_name ).unwrap_or_default();
 
@@ -184,7 +184,7 @@ pub fn build_main_window(plugins: HashMap<String, PluginEntry>) -> Rc<RefCell<Ma
         Label::builder()
             .text( "Script" )
             .parent( &app_mut.window )
-            .position( ( 170, 70 ) )
+            .position( ( 190, 75 ) )
             .size( LABEL_SIZE )
         .build( &mut app_mut.lbl_script ).unwrap_or_default();
 
@@ -197,7 +197,7 @@ pub fn build_main_window(plugins: HashMap<String, PluginEntry>) -> Rc<RefCell<Ma
         Label::builder()
             .text( "Command NS" )
             .parent( &app_mut.window )
-            .position( ( 170, 110 ) )
+            .position( ( 190, 115 ) )
             .size( LABEL_SIZE )
         .build( &mut app_mut.lbl_concommandns ).unwrap_or_default();
 
@@ -217,7 +217,7 @@ pub fn build_main_window(plugins: HashMap<String, PluginEntry>) -> Rc<RefCell<Ma
         Label::builder()
             .text( "Admin Level" )
             .parent( &app_mut.window )
-            .position( ( 170, 150 ) )
+            .position( ( 190, 155 ) )
             .size( LABEL_SIZE )
         .build( &mut app_mut.lbl_adminlevel ).unwrap_or_default();
 
@@ -231,31 +231,31 @@ pub fn build_main_window(plugins: HashMap<String, PluginEntry>) -> Rc<RefCell<Ma
         Label::builder()
             .text( "Included Maps" )
             .parent( &app_mut.window )
-            .position(( 170, 180 ) )
+            .position( ( 190, 190 ) )
             .size( ( 180, 25 ) )
         .build(&mut app_mut.lbl_maps_included ).unwrap_or_default();
         
         TextBox::builder()
             .parent( &app_mut.window )
-            .position( ( 170, 200 ) )
-            .size( ( 330, 80 ) )
+            .position( ( 190, 210 ) )
+            .size( ( 310, 80 ) )
         .build(&mut app_mut.txt_maps_included ).unwrap_or_default();
 
         Label::builder()
-            .text("Excluded Maps")
+            .text( "Excluded Maps" )
             .parent( &app_mut.window )
-            .position(( 170, 280 ) )
+            .position( ( 190, 290 ) )
             .size( ( 180, 25 ) )
         .build( &mut app_mut.lbl_maps_excluded ).unwrap_or_default();
 
         TextBox::builder()
             .parent( &app_mut.window )
-            .position(( 170, 300 ) )
-            .size( ( 330, 80 ) )
+            .position(( 190, 310 ) )
+            .size( ( 310, 80 ) )
         .build( &mut app_mut.txt_maps_excluded ).unwrap_or_default();
         // Buttons
         Button::builder()
-            .text( "Add" )
+            .text( "Add new" )
             .parent( &app_mut.window )
             .position( ( 10, 410 ) )
             .size( BUTTON_SIZE )

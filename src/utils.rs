@@ -40,9 +40,10 @@ pub fn search_drives(file_name: &str) -> PathBuf
 
     let mut results: Vec<PathBuf> = Vec::new();
 
-    for drive in ["A:/", "B:/", "C:/", "D:/", "E:/", "F:/",]
+    for c in 'A'..='Z'
     {
-        let root = Path::new( drive );
+        let drive = format!( "{}:/", c );
+        let root = Path::new( &drive );
 
         if root.exists() && root.is_dir()
         {

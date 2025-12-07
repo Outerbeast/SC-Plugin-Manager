@@ -15,29 +15,37 @@ Sven Co-op Plugin Manager — a small Windows GUI utility to view and manage Sve
 🔍 Plugin List (Left Panel)
 - Browse available plugins: Each plugin is listed with a checkbox.
 - Enable/Disable plugins: Toggle the checkbox to activate or deactivate a plugin.
+- `✔` means the plugin is enabled
+- `☐` means the plugin is disabled
 
 ⚙ Plugin Configuration (Right Panel)
+
 When a plugin is selected, you can configure its behavior:
-- Name: Display name of the plugin.
-- Script: Path or identifier for the plugin script.
-- Command NS: Namespace prefix for plugin commands.
-- Admin Level: Choose required access level from the dropdown.
-- Included Maps: List of maps where the plugin is active.
-- Excluded Maps: List of maps where the plugin is disabled.
+- `Name`: Display name of the plugin.
+- `Script`: Path and filename (without `.as` extension) for the plugin script. The path begins from `scripts/plugins`.
+
+Optional fields:
+- `Command NS`: Namespace prefix for plugin commands.
+- `Admin Level`: Choose required access level from the dropdown.
+- `Included Maps`: List of maps where the plugin is active.
+- `Excluded Maps`: List of maps where the plugin is disabled.
 
 ✅ Plugin Controls (Bottom Section)
-- Enabled: Checkbox to toggle plugin activation.
-- Add: Create a new plugin entry.
-- Remove: Delete the selected plugin.
-- Apply: Save changes to the current plugin.
-- Save: Persist all plugin configurations to disk.
+- `☐ Enabled`: Checkbox to toggle plugin activation.
+- `Add new`: Opens a file selection dialogue box to install a new plugin.
+- `Remove`: Delete the selected plugin.
+- `Apply`: Applies changes to the current plugin.
+- `Save`: Save all changes to plugins. This will exit the application.
+
+When a plugin is added, the script file be installed to `svencoop_addon/scripts/plugins`.
+When a plugin is removed, the script file will still remain installed, but will not be loaded.
 
 💡 Tips
-- Use the Apply button before switching plugins to avoid losing changes.
-- The Save button writes all plugin states to the Sven Co-op plugin file.
+- Use the `Apply` button before switching plugins to avoid losing changes.
+- The `Save` button writes all plugin states to the Sven Co-op plugin file.
 - If a plugin doesn’t behave as expected, check the `Included Maps` and `Excluded Maps` fields
 
-For more detailed information on how to configure plugins, please refer to to the [official documentation](https://wiki.svencoop.com/Running_Scripts#Plugins)
+For more detailed information on how to configure plugins, please refer to to the [official documentation](https://wiki.svencoop.com/Running_Scripts#Plugins).
 
 ### Quick Add
 

@@ -27,14 +27,15 @@ use std::
 
 use crate::
 {
-    utils::open_file_dialog,
-    APPNAME, plugin::
+    APPNAME,
+    plugin::
     {
         self,
-        AdminLevel,
+        ADMIN_NO,
         PluginEntry,
         save_plugins
-    }
+    },
+    utils::open_file_dialog
 };
 
 pub fn GUI(plugins: HashMap<String, PluginEntry>)
@@ -77,15 +78,7 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                         gui.txt_name.set_text( &selected_plugin.name );
                         gui.txt_script.set_text( &selected_plugin.script );
                         gui.txt_concommandns.set_text( &selected_plugin.concommandns );
-                        gui.cb_adminlevel.set_selection(
-                        match selected_plugin.adminlevel
-                        {
-                            AdminLevel::AdminNo => Some( 0 ),
-                            AdminLevel::AdminYes => Some( 1 ),
-                            AdminLevel::AdminOwner => Some( 2 ),
-                            _ => Some( 0 ),
-                        });
-
+                        gui.cb_adminlevel.set_selection( Some( selected_plugin.adminlevel as usize ) );
                         gui.txt_maps_included.set_text( &selected_plugin.maps_included );
                         gui.txt_maps_excluded.set_text( &selected_plugin.maps_excluded );
 
@@ -125,8 +118,7 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                 }
                 // Rebuild and replace the ListBox collection so the UI shows the new checkmark
                 {
-                    let plugins_ref = gui.plugins.borrow();
-                    let mut rows: Vec<(String, bool)> = plugins_ref
+                    let mut rows: Vec<(String, bool)> = gui.plugins.borrow()
                         .values()
                         .map( |p| ( p.name.clone(), p.state == plugin::PluginState::Enabled ) )
                     .collect();
@@ -192,10 +184,9 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                     return;
                 }
 
-                if
-                    let Ok( conf ) = crate::config::read_store() &&
-                    let Some( svencoopdir ) = conf.svencoopdir &&
-                    let Err( e ) = PluginEntry::install_plugin( &script_path.to_string_lossy(), &std::path::PathBuf::from( svencoopdir ) )
+                if let Ok( conf ) = crate::config::read_store()
+                && let Some( svencoopdir ) = conf.svencoopdir
+                && let Err( e ) = PluginEntry::install_plugin( &script_path.to_string_lossy(), &std::path::PathBuf::from( svencoopdir ) )
                 {
                     message_box( "Install Error", 
                     format!( "Failed to install plugin {}.\nReason:\n{}\n\nYou will need to manually add this file to the game.", name, e ).as_str(),
@@ -328,16 +319,7 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                     plugin.name = gui.txt_name.text().to_string();
                     plugin.script = gui.txt_script.text().to_string();
                     plugin.concommandns = gui.txt_concommandns.text().to_string();
-
-                    let admin_idx = gui.cb_adminlevel.selection().unwrap_or( 0 );
-                    plugin.adminlevel = match admin_idx
-                    {
-                        0 => AdminLevel::AdminNo,
-                        1 => AdminLevel::AdminYes,
-                        2 => AdminLevel::AdminOwner,
-                        _ => AdminLevel::AdminNo,
-                    };
-
+                    plugin.adminlevel = gui.cb_adminlevel.selection().unwrap_or( ADMIN_NO as usize ) as i8;
                     plugin.maps_included = gui.txt_maps_included.text().to_string();
                     plugin.maps_excluded = gui.txt_maps_excluded.text().to_string();
                     // Reinsert under the (possibly new) key
@@ -346,8 +328,7 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                 } // plugins_ref dropped here
                 // Rebuild listbox collection so UI reflects new name and state
                 {
-                    let plugins_ref = gui.plugins.borrow();
-                    let mut rows: Vec<(String, bool)> = plugins_ref
+                    let mut rows: Vec<(String, bool)> = gui.plugins.borrow()
                         .values()
                         .map( |p| ( p.name.clone(), p.state == plugin::PluginState::Enabled ) )
                     .collect();
@@ -384,7 +365,8 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                         MessageIcons::Info );
 
                         stop_thread_dispatch();
-                    },
+                    }
+
                     Err( e ) =>
                     {
                         if message_box( "Error", 
@@ -416,7 +398,7 @@ pub fn GUI(plugins: HashMap<String, PluginEntry>)
                 {   // Save plugins
                     match save_plugins( &gui.plugins.borrow() )
                     {
-                        Ok( _ ) => { },
+                        Ok( _ ) => { }
                         Err( e ) =>
                         {
                             message_box( "Error",
