@@ -105,7 +105,7 @@ impl PluginEntry
         if name_trim.is_empty() || script_trim.is_empty()
         {
             println!( "Plugin name and script cannot be empty." );
-            return ( String::new(), PluginEntry::new("", "") );
+            return ( String::new(), PluginEntry::new( "", "" ) );
         }
 
         let key = name_trim.to_string();
@@ -161,29 +161,42 @@ impl PluginEntry
         {
             "name" "<NAME>"
             "script" "<SCRIPT>"
-            "concommandns" "<CONCOMMANDNS>"
             "adminlevel" "<ADMINLEVEL>"
+            "concommandns" "<CONCOMMANDNS>"
             "maps_included" "<MAPSINCLUDED>"
             "maps_excluded" "<MAPSEXCLUDED>"
-        }
-        "#;
+        }"#;
 
-        plugin_format
+        let mut plugin_entry = plugin_format
             .replace( "<NAME>", &self.name )
             .replace( "<SCRIPT>", &self.script )
-            .replace( "<CONCOMMANDNS>", &self.concommandns )
-            .replace( "<ADMINLEVEL>", &( self.adminlevel as i32 ).to_string() )
-            .replace( "<MAPSINCLUDED>", &self.maps_included )
-            .replace( "<MAPSEXCLUDED>", &self.maps_excluded )
+            .replace( "<ADMINLEVEL>", &( self.adminlevel as i32 ).to_string() );
+        // Only include optional fields if they are not empty
+        for ( placeholder, value, full_line ) in
+        [
+            ( "<CONCOMMANDNS>", &self.concommandns, r#""concommandns" "<CONCOMMANDNS>""# ),
+            ( "<MAPSINCLUDED>", &self.maps_included, r#""maps_included" "<MAPSINCLUDED>""# ),
+            ( "<MAPSEXCLUDED>", &self.maps_excluded, r#""maps_excluded" "<MAPSEXCLUDED>""# ),
+        ]
+        {
+            plugin_entry =
+            match value.trim().is_empty()
+            {
+                true => plugin_entry.replace( full_line, "" ),// Unfortunately leaves whitespace, but oh well
+                false => plugin_entry.replace( placeholder, value ),
+            };
+        }
+
+        plugin_entry
     }
 }
 
 pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEntry>
 {
     let lines: Vec<&str> = text.lines().collect();
-    let mut i = 0usize;
+    let mut i: usize = 0;
     let mut plugins: HashMap<String, PluginEntry> = HashMap::new();
-    let mut unnamed_counter = 0usize;
+    let mut unnamed_counter: usize = 0;
 
     while i < lines.len()
     {
@@ -235,7 +248,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             }
 
             let end = i;
-            // ensure we have a key for the hashmap; if name is empty, generate a unique key
+            // Ensure we have a key for the hashmap; if name is empty, generate a unique key
             let key =
             if name.is_empty() 
             {
@@ -294,8 +307,8 @@ pub fn save_plugins(plugins: &HashMap<String, PluginEntry>) -> Result<(), io::Er
         None => std::env::current_dir().unwrap_or_default(),// ??? Theoretically should never happen.
     };
 
-    fs::write( path.join( FILENAME_PLUGINS ), format!( "\"plugins\"\n{{\n{}}}\n", enabled_plugins), )?;
-    fs::write( path.join( FILENAME_DISABLED_PLUGINS ),format!( "\"disabled_plugins\"\n{{\n{}}}\n", disabled_plugins), )?;
+    fs::write( path.join( FILENAME_PLUGINS ), format!( "\"plugins\"\n{{{}}}", enabled_plugins ), )?;
+    fs::write( path.join( FILENAME_DISABLED_PLUGINS ),format!( "\"disabled_plugins\"\n{{{}}}", disabled_plugins ), )?;
 
     Ok( () )
 }

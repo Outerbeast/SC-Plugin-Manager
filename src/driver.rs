@@ -33,8 +33,7 @@ use crate::
     APPNAME,
     config,
     gui,
-    plugin::{ self, * },
-    utils::open_file
+    plugin::{ self, * }
 };
 
 pub fn run() -> Result<(), io::Error>
@@ -75,7 +74,7 @@ pub fn run() -> Result<(), io::Error>
 
     for ( path, state ) in files
     {
-        match open_file( path.to_str().unwrap_or_default() )
+        match std::fs::read_to_string( path.to_str().unwrap_or_default() )
         {
             Ok( file ) =>
             {

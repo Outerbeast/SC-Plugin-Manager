@@ -18,19 +18,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 extern crate native_windows_gui as nwg;
 use std::
 {
-    fs, 
     path::
     {
         Path,
         PathBuf
     }
 };
-// Is this function necessary?
-pub fn open_file(path: &str) -> Result<String, std::io::Error>
-{
-    fs::read_to_string( path )
-}
-
+// Searches all drives for a specific filename, returns the path to that file
 pub fn search_drives(file_name: &str) -> PathBuf
 {
     if file_name.trim().is_empty()

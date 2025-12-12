@@ -40,20 +40,24 @@ const TEXTFIELD_SIZE: (i32, i32) = ( 200, 25 );
 
 pub const UNCHECKED: &str = "☐";
 pub const CHECKED:   &str = "✔";
-pub const HELP_INFO: &str =
-"This is a simple application to manage your Sven Co-op plugins.\n\n
-Plugin List: Toggle checkboxes to enable/disable plugins.\n
-Config Panel: Edit name, script, command namespace, admin level, and map filters.\n
-Controls:\n
--'Add': Create new plugin\n
--'Remove': Remove selected plugin\n
--'Apply': Save current plugin changes\n
--'Save' Write all plugin states and exit\n
-Tips:\n
--Use 'Apply' before switching plugins.\n
--'Save' commits all changes.\n
-Use map filters to control plugin activation per map.\n\n
-Thank you for using this app!\nIf you'd like to give feedback feel free to put them here: https://github.com/Outerbeast/SC-Plugin-Manager/issues";
+pub const HELP_INFO: &str = 
+    r#"This is a simple application to manage your Sven Co-op plugins.
+    Plugin List: Toggle checkboxes to enable/disable plugins.
+    Config Panel: Edit name, script, command namespace, admin level, and map filters.
+    
+    Controls:
+    -"Add": Create new plugin
+    -"Remove": Remove selected plugin
+    -"Apply": Save current plugin changes
+    -"Save": Write all plugin states and exit
+    Tips:
+    -Use "Apply'" before switching plugins.
+    -"Save" commits all changes.
+    Use map filters to control plugin activation per map.
+
+    Thank you for using this app!
+    If you'd like to give feedback feel free to put them here: https://github.com/Outerbeast/SC-Plugin-Manager/issues
+    "#;
 
 #[derive(Default)]
 pub struct MainWindow
