@@ -113,7 +113,7 @@ pub fn run() -> Result<(), io::Error>
                 if !file.ends_with( ".as" )
                 {
                     gui::window::message_box( "Invalid File", 
-                        format!( "'{}' is not a valid plugin script file.\nPlug script files end with the '.as' file extension.", file ).as_str(), 
+                        format!( "'{}' is not a valid plugin script file.\nPlugin script files end with the '.as' file extension.", file ).as_str(), 
                         MessageButtons::Ok, 
                         MessageIcons::Warning );
 
@@ -135,7 +135,8 @@ pub fn run() -> Result<(), io::Error>
                 if plugins.contains_key( name )
                 {
                     gui::window::message_box( "Info",
-                        format!( "The plugin script '{}' is already installed.", file ).as_str(), 
+                        format!( "The plugin script '{}' is already installed.\n\n
+                        To disable or remove this plugin, launch {} and do this manually.", file, APPNAME ).as_str(), 
                         MessageButtons::Ok, 
                         MessageIcons::Info );
 
@@ -147,7 +148,7 @@ pub fn run() -> Result<(), io::Error>
                 // Install the script file to the game first
                 match PluginEntry::install_plugin( file, &svencoop_dir )
                 {
-                    Ok( _ ) => { }
+                    Ok( _ ) => { }// Redundant, for now
 
                     Err( e ) =>// Something bad happened, skip this install
                     {

@@ -15,22 +15,28 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{env, io};
-use winresource::WindowsResource;
-
-fn main() -> io::Result<()>
+#[cfg(windows)]
+fn main() -> std::io::Result<()>
 {
-    if env::var_os( "CARGO_CFG_WINDOWS" ).is_some()
-    {
-        WindowsResource::new()
-            .set_icon( "icon.ico" )
-            .set( "FileDescription", "Sven Co-op Plugin Manager" )
-            .set( "ProductName", "SCPluginManager" )
-            .set( "FileVersion", "1.0.0" )
-            .set( "ProductVersion", "1.0.0" )
-            .set( "LegalCopyright", "Outerbeast" )
-        .compile()?;
-    }
-    
-    Ok( () )
+    winresource::WindowsResource::new()
+        .set_icon( "icon.ico" )
+        .set( "ProductName", "SCPluginManager" )
+        .set( "ProductVersion", "1.0.0" )
+        .set( "FileDescription", "Sven Co-op Plugin Manager" )
+        .set( "FileVersion", "1.0.0" )
+        .set( "LegalCopyright", "Outerbeast" )
+        .set( "OriginalFilename", "SCPluginManager.exe" )
+        .set( "InternalName", "SCPluginManager" )
+        .set( "CompanyName", "Outerbeast" )
+        .set( "LegalTrademarks", "Outerbeast" )
+        .set( "Comments", "Sven Co-op Plugin Manager" )
+    .compile()?;
+
+    Ok(())
+}
+// No Linux build is planned. This is just to avoid build errors on non-Windows targets.
+#[cfg(not(windows))]
+fn main() -> std::io::Result<()>
+{
+    compile_error!( "This application only supports Windows targets" );
 }

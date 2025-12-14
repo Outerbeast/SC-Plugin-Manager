@@ -78,7 +78,8 @@ impl PluginEntry
 
     pub fn toggle_state(&mut self)
     {
-        self.state = match self.state
+        self.state =
+        match self.state
         {
             PluginState::Enabled => PluginState::Disabled,
             PluginState::Disabled => PluginState::Enabled,
@@ -145,7 +146,7 @@ impl PluginEntry
         // Copy the file
         fs::copy( &src, &dst )?;
 
-        Ok(())
+        Ok( () )
     }
     // Returns the plugin entry as a formatted string
     pub fn write_plugin(&self) -> String
@@ -183,7 +184,7 @@ impl PluginEntry
             match value.trim().is_empty()
             {
                 true => plugin_entry.replace( full_line, "" ),// Unfortunately leaves whitespace, but oh well
-                false => plugin_entry.replace( placeholder, value ),
+                false => plugin_entry.replace( placeholder, value )
             };
         }
 
@@ -206,8 +207,8 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
         {
             let mut name = String::new();// This field may not be necessary given this is being shoved into a hashmap where the plugin name is the key
             let mut script = String::new();
-            let mut concommandns = String::new();
             let mut adminlevel = ADMIN_NO;
+            let mut concommandns = String::new();
             let mut maps_included = String::new();
             let mut maps_excluded = String::new();
 
@@ -226,14 +227,14 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 {
                     script = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
                 } 
-                else if inner_line.starts_with( "\"concommandns\"" ) 
-                {
-                    concommandns = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
-                }
                 else if inner_line.starts_with( "\"adminlevel\"" ) 
                 {
                     let level = inner_line.split( '"' ).nth( 3 ).unwrap_or( "0" );
                     adminlevel = level.parse::<i8>().unwrap_or( 0 );
+                }
+                else if inner_line.starts_with( "\"concommandns\"" ) 
+                {
+                    concommandns = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
                 }
                 else if inner_line.starts_with( "\"maps_included\"" )
                 {
@@ -247,22 +248,23 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 i += 1;
             }
 
-            let end = i;
-            // Ensure we have a key for the hashmap; if name is empty, generate a unique key
-            let key =
-            if name.is_empty() 
+            let key = // Ensure we have a key for the hashmap; if name is empty, generate a unique key
+            match name.is_empty()
             {
-                let k = format!( "__unnamed_{}", unnamed_counter );
-                unnamed_counter += 1;
+                true =>
+                {
+                    let k = format!( "__unnamed_{}", unnamed_counter );
+                    unnamed_counter += 1;
 
-                k
-            } 
-            else 
-            {
-                name.clone()
+                    k
+                }
+
+                false => name.clone()
             };
 
-            let plugin = PluginEntry
+            let end = i;
+            // insert; if duplicate key exists, this will replace the previous entry
+            plugins.insert( key, PluginEntry
             {
                 name,
                 script,
@@ -273,9 +275,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 maps_excluded,
                 start,
                 end,
-            };
-            // insert; if duplicate key exists, this will replace the previous entry
-            plugins.insert( key, plugin );
+            });
         }
 
         i += 1;

@@ -84,7 +84,7 @@ pub fn open_file_dialog(parent: &nwg::Window) -> Option<PathBuf>
         match dlg.get_selected_item()
         {
             Ok( os ) => Some( PathBuf::from( os ) ),
-            Err( _ ) => None,
+            Err( _ ) => None
         }
     }
     else 
