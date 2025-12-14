@@ -100,4 +100,4 @@ If you have feedback or encounter issues, please open an issue on [GitHub Issues
 Outerbeast - Author
 
 ### Special Thanks
-Thanks to the [Native Windows GUI](https://github.com/native-windows-gui/native-windows-gui) project for providing a Rust library to build native Windows applications.
+Thanks to the [Native Windows GUI](https://github.com/gabdube/native-windows-gui) project for providing a Rust library to build native Windows applications.
