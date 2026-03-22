@@ -1,5 +1,5 @@
 /*
-	Sven Co-op Plugin Manager Version 1.0
+    Sven Co-op Plugin Manager Version 2.0
 
 Copyright (C) 2025 Outerbeast
 This program is free software: you can redistribute it and/or modify
@@ -17,23 +17,33 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 use std::
 {
+    collections,
     env,
+    fs,
     io,
     path::Path
-};
-
-use native_windows_gui::
-{
-    MessageButtons,
-    MessageIcons
 };
 
 use crate::
 {
     APPNAME,
+    app::
+    {
+        launch_gui,
+        popup,
+        PopupButtons
+    },
     config,
-    gui,
-    plugin::{ self, * }
+    plugin::
+    {
+        load_plugins,
+        save_plugins,
+        PluginContext,
+        PluginEntry,
+        PluginState,
+        FILENAME_DISABLED_PLUGINS,
+        FILENAME_PLUGINS,
+    }
 };
 
 pub fn run() -> Result<(), io::Error>
@@ -41,18 +51,19 @@ pub fn run() -> Result<(), io::Error>
     let svencoop_dir =
     match config::init()
     {
-        Ok( dir ) =>
-        {
-            dir
-        }
-
+        Ok( dir ) => dir,
         Err( e ) =>
         {
-            gui::window::message_box( "Sven Co-op install Not Found",
-                format!( "Could not find a valid Sven Co-op installation.
-                    \nReason:\n{}\n\nTry installing {} directly to 'Sven Co-op\\svencoop' and try again.", e, APPNAME ).as_str(), 
-                MessageButtons::Ok,
-                MessageIcons::Error );
+            popup(
+                "Sven Co-op install Not Found",
+                &format!(
+                    "Could not find a valid Sven Co-op installation.\nReason:\n{}\n\n\
+                    Try installing {} directly to 'Sven Co-op\\svencoop' and try again.",
+                    e, APPNAME
+                ),
+                "❌",
+                PopupButtons::None
+            );
 
             return Err( e );
         }
@@ -60,44 +71,39 @@ pub fn run() -> Result<(), io::Error>
 
     let files =
     [
-        (
-            svencoop_dir.join( plugin::FILENAME_PLUGINS ),
-            PluginState::Enabled,
-        ),
-        (
-            svencoop_dir.join( plugin::FILENAME_DISABLED_PLUGINS ),
-            PluginState::Disabled,
-        ),
+        ( svencoop_dir.join( FILENAME_PLUGINS ), PluginState::Enabled ),
+        ( svencoop_dir.join( FILENAME_DISABLED_PLUGINS ), PluginState::Disabled )
     ];
 
-    let mut plugins = std::collections::HashMap::new();
+    let mut plugins = collections::HashMap::new();
 
     for ( path, state ) in files
     {
-        match std::fs::read_to_string( path.to_str().unwrap_or_default() )
+        match fs::read_to_string( path.to_str().unwrap_or_default() )
         {
-            Ok( file ) =>
-            {
-                plugins.extend( load_plugins( &file, state ) );
-            }
+            Ok( file ) => plugins.extend( load_plugins( &file, state ) ),
 
             Err( e ) =>
-            {   // It doesn't exist since we haven't created it yet.
+            {
                 if path.ends_with( FILENAME_DISABLED_PLUGINS )
                 {
                     break;
                 }
 
-                gui::window::message_box(
+                popup(
                     "Error reading plugin file",
-                    &format!( "The plugin file in '{}' could not be opened.\nReason:\n{}", path.display(), e ),
-                    MessageButtons::Ok,
-                    MessageIcons::Error );
+                    &format!(
+                        "The plugin file in '{}' could not be opened.\nReason:\n{}",
+                        path.display(),
+                        e
+                    ),
+                    "❌",
+                    PopupButtons::Ok );
             }
         }
     }
-    // Quick install
-    let args: Vec<String> = env::args().collect();
+
+    let args: Vec<_> = env::args().collect();
 
     match args.len()
     {
@@ -112,81 +118,93 @@ pub fn run() -> Result<(), io::Error>
 
                 if !file.ends_with( ".as" )
                 {
-                    gui::window::message_box( "Invalid File", 
-                        format!( "'{}' is not a valid plugin script file.\nPlugin script files end with the '.as' file extension.", file ).as_str(), 
-                        MessageButtons::Ok, 
-                        MessageIcons::Warning );
+                    popup("Invalid File",
+                          &format!( "'{}' is not a valid plugin script file.\n\
+                        Plugin script files end with the '.as' file extension.", file ),
+                          "⚠️", PopupButtons::Ok );
 
                     continue;
                 }
-                
-                let name = Path::new( file ).file_stem().and_then( |s| s.to_str() ).unwrap_or( "" );
-                
+
+                let name = Path::new( file )
+                    .file_stem()
+                    .and_then( |s| s.to_str() )
+                .unwrap_or(".");
+
                 if name.is_empty()
                 {
-                    gui::window::message_box( "Error",
-                        format!( "Failed to extract plugin name from file '{}'", file ).as_str(), 
-                        MessageButtons::Ok, 
-                        MessageIcons::Error );
+                    popup(
+                        "Error",
+                        &format!( "Failed to extract plugin name from file '{}'", file ),
+                        "❌",
+                        PopupButtons::Ok );
 
                     continue;
                 }
-                // Plugin already exists
-                if plugins.contains_key( name )
+
+                if plugins.clone().contains_key( name )
                 {
-                    gui::window::message_box( "Info",
-                        format!( "The plugin script '{}' is already installed.\n\n
-                        To disable or remove this plugin, launch {} and do this manually.", file, APPNAME ).as_str(), 
-                        MessageButtons::Ok, 
-                        MessageIcons::Info );
+                    popup("Info",
+                          &format!("The plugin script '{}' is already installed.\n\n\
+                        To disable or remove this plugin, launch {} and do this manually.", file, APPNAME),
+                          "ℹ️", PopupButtons::Ok );
 
                     continue;
                 }
-                
+
                 let new_plugin_entry = PluginEntry::add_plugin( name, file );
                 plugins.insert( new_plugin_entry.0, new_plugin_entry.1 );
-                // Install the script file to the game first
+
                 match PluginEntry::install_plugin( file, &svencoop_dir )
                 {
-                    Ok( _ ) => { }// Redundant, for now
-
-                    Err( e ) =>// Something bad happened, skip this install
+                    Ok( () ) => {}
+                    Err( e ) =>
                     {
-                        gui::window::message_box( "Installation Failed",
-                            format!( "Failed to install plugin '{}' from script file '{}'.\nError code {}", name, file, e ).as_str(), 
-                            MessageButtons::Ok, 
-                            MessageIcons::Error );
+                        popup("Installation Failed",
+                              &format!("Failed to install plugin '{}' from script file '{}'.\
+                            \nError code {}", name, file, e),
+                              "❌", PopupButtons::Ok );
 
                         continue;
                     }
                 }
-                // Update plugin config file
-                match save_plugins( &plugins )
+
+                match save_plugins( &PluginContext::from_hashmap( plugins.clone() ) )
                 {
-                    Ok( _ ) =>
+                    Ok(()) =>
                     {
-                        gui::window::message_box( "Plugin Installed",
-                            format!( "Plugin '{}' installed from script file '{}'.", name, file ).as_str(), 
-                            MessageButtons::Ok, 
-                            MessageIcons::Info );
+                        popup(
+                            "Plugin Installed",
+                            &format!("Plugin '{}' installed from script file '{}'.", name, file),
+                            "ℹ️",
+                            PopupButtons::Ok );
                     }
 
                     Err( e ) =>
                     {
-                        gui::window::message_box( "Installation Failed",
-                            format!( "Failed to install plugin '{}' from script file '{}'.\nError code {}", name, file, e ).as_str(), 
-                            MessageButtons::Ok, 
-                            MessageIcons::Error );
+                        popup("Installation Failed",
+                              &format!( "Failed to install plugin '{}' from script file '{}'.\
+                            \nError code {}", name, file, e ),
+                              "❌", PopupButtons::Ok );
                     }
                 }
             }
         }
 
-        _ =>// Nothing was dragged, launch menu
+        _ =>// Nothing was dragged, launch gui
         {
-            gui::events::GUI( plugins );
+            if let Err( e ) = launch_gui( PluginContext::from_hashmap( plugins ) )
+            {
+                popup(
+                    "Error",
+                    &format!( "Failed to launch window.\nReason: {e}" ),
+                    "❌",
+                    PopupButtons::None );
+
+                return Err( io::Error::other( e ) );
+            }
         }
     }
 
-    Ok( () )
+    Ok(())
 }

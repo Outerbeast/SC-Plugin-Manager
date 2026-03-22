@@ -1,5 +1,5 @@
 /*
-	Sven Co-op Plugin Manager Version 1.0
+	Sven Co-op Plugin Manager Version 2.0
 
 Copyright (C) 2025 Outerbeast
 This program is free software: you can redistribute it and/or modify
@@ -17,31 +17,101 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 use std::
 {
+    env,
     fs,
     io,
     collections::HashMap,
-    path::
-    {
-        Path,
-        PathBuf
-    }
+    ops::Not,
+    path::{ Path, PathBuf }
 };
+
+use num_enum::{ FromPrimitive, IntoPrimitive };
 
 pub const FILENAME_PLUGINS: &str = "default_plugins.txt";
 pub const FILENAME_DISABLED_PLUGINS: &str = "disabled_plugins.txt";
-// AdminLevel_t "enum" (actual Rust enums made code unmanageable, hence the choice)
-pub type AdminLevel = i8;
-pub const ADMIN_INIT: AdminLevel  = -1;// (UNUSED) Level on connect, tells functions not to use cached level
-pub const ADMIN_NO: AdminLevel    = 0;// Not an administrator
-pub const ADMIN_YES: AdminLevel   = 1;// Server administrator
-pub const ADMIN_OWNER: AdminLevel = 2;// Server owner (applies to a listenserver host player)
 
-#[derive(Debug, Clone, PartialEq)]
+pub const CHECKED: &str = "✔";
+pub const UNCHECKED: &str = "☐";
+
+#[derive( Debug, Default, Clone, Copy, FromPrimitive, IntoPrimitive )]
+#[repr(isize)]
+pub enum AdminLevel// straight from AdminLevel_t: https://sven-coop.github.io/AdminLevel_t
+{
+    Init = -1,// (UNUSED) Level on connect, tells functions not to use cached level
+
+    #[default]
+    No,// Not an administrator
+    Yes,// Not an administrator
+    Owner// Server owner (applies to a listenserver host player)
+}
+
+#[derive( Debug, Clone, PartialEq )]
 pub enum PluginState
 {
     Enabled,
     Disabled,
-    Removed,
+    Removed
+}
+
+impl PluginState
+{
+    pub fn marker(&self) -> &'static str
+    {
+        match self
+        {
+            PluginState::Enabled => CHECKED,
+            PluginState::Disabled | PluginState::Removed => UNCHECKED
+        }
+    }
+
+    pub fn toggle(&self) -> Self
+    {
+        match self
+        {
+            PluginState::Disabled => PluginState::Enabled,
+            PluginState::Enabled => PluginState::Disabled,
+            PluginState::Removed => PluginState::Removed// stays removed.
+        }
+    }
+}
+
+impl Not for PluginState
+{
+    type Output = PluginState;
+
+    fn not(self) -> Self
+    {
+        match self
+        {
+            PluginState::Disabled => PluginState::Enabled,
+            PluginState::Enabled => PluginState::Disabled,
+            _ => self,
+        }
+    }
+}
+
+#[derive( Default )]
+pub struct PluginContext
+{
+    pub plugins: HashMap<String, PluginEntry>,
+    pub selected_plugin_name: Option<String>
+}
+
+impl PluginContext
+{
+    pub fn from_hashmap(plugins: HashMap<String, PluginEntry>) -> Self
+    {
+        Self
+        {
+            plugins,
+            selected_plugin_name: None,
+        }
+    }
+
+    pub fn has_plugin(&self, name: &str) -> bool
+    {
+        self.plugins.contains_key( name )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -62,13 +132,13 @@ impl PluginEntry
 {   // Constructor
     pub fn new(name: &str, script: &str) -> Self
     {
-        PluginEntry
+        Self
         {
             name: name.to_string(),
             script: script.to_string(),
             state: PluginState::Enabled,// If we've just created it, then of course it's enabled
             concommandns: String::new(),
-            adminlevel: ADMIN_NO,
+            adminlevel: AdminLevel::No,
             maps_included: String::new(),
             maps_excluded: String::new(),
             start: 0,
@@ -78,13 +148,7 @@ impl PluginEntry
 
     pub fn toggle_state(&mut self)
     {
-        self.state =
-        match self.state
-        {
-            PluginState::Enabled => PluginState::Disabled,
-            PluginState::Disabled => PluginState::Enabled,
-            PluginState::Removed => PluginState::Removed,
-        };
+        self.state = self.state.toggle();
     }
     // !-TODO-!: need to get the path to the svencoop install again to check if the given script is there or not
 /*     pub fn validate_plugin_install(&self) -> bool
@@ -98,7 +162,7 @@ impl PluginEntry
     } */
     // New plugin entry, name and script are required minimum fields, returns (key, Plugin) tuple
     // Maybe this should be a Plugin constructor instead?
-    pub fn add_plugin(name: &str, script: &str) -> (String, PluginEntry)
+    pub fn add_plugin(name: &str, script: &str) -> (String, Self)
     {
         let name_trim = name.trim();
         let script_trim = script.trim();
@@ -117,13 +181,13 @@ impl PluginEntry
             script: script_trim.to_string(),
             state: PluginState::Enabled,
             concommandns: String::new(),
-            adminlevel: ADMIN_NO,
+            adminlevel: AdminLevel::No,
             maps_included: String::new(),
             maps_excluded: String::new(),
             start: 0,
             end: 0,
         };
-        // To-do: actually install the script file to svencoop\scripts\plugins
+
         ( key, plugin )
     }
     // Copies the file to the game install
@@ -151,7 +215,9 @@ impl PluginEntry
     // Returns the plugin entry as a formatted string
     pub fn write_plugin(&self) -> String
     {
-        if self.name.trim().is_empty() || self.script.trim().is_empty() || matches!( self.state, PluginState::Removed )
+        if self.name.trim().is_empty()
+        || self.script.trim().is_empty()
+        || matches!( self.state, PluginState::Removed )
         {
             return String::new();
         }
@@ -171,13 +237,14 @@ impl PluginEntry
         let mut plugin_entry = plugin_format
             .replace( "<NAME>", &self.name )
             .replace( "<SCRIPT>", &self.script )
-            .replace( "<ADMINLEVEL>", &( self.adminlevel as i32 ).to_string() );
+            .replace( "<ADMINLEVEL>", &( self.adminlevel as i8 )
+        .to_string() );
         // Only include optional fields if they are not empty
         for ( placeholder, value, full_line ) in
         [
             ( "<CONCOMMANDNS>", &self.concommandns, r#""concommandns" "<CONCOMMANDNS>""# ),
             ( "<MAPSINCLUDED>", &self.maps_included, r#""maps_included" "<MAPSINCLUDED>""# ),
-            ( "<MAPSEXCLUDED>", &self.maps_excluded, r#""maps_excluded" "<MAPSEXCLUDED>""# ),
+            ( "<MAPSEXCLUDED>", &self.maps_excluded, r#""maps_excluded" "<MAPSEXCLUDED>""# )
         ]
         {
             plugin_entry =
@@ -194,8 +261,8 @@ impl PluginEntry
 
 pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEntry>
 {
-    let lines: Vec<&str> = text.lines().collect();
-    let mut i: usize = 0;
+    let lines: Vec<_> = text.lines().collect();
+    let mut i = 0;
     let mut plugins: HashMap<String, PluginEntry> = HashMap::new();
     let mut unnamed_counter: usize = 0;
 
@@ -204,10 +271,10 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
         let line = lines[i].trim();
 
         if line.starts_with( "\"plugin\"" )
-        {
-            let mut name = String::new();// This field may not be necessary given this is being shoved into a hashmap where the plugin name is the key
+        {   // This field may not be necessary given this is being shoved into a hashmap where the plugin name is the key
+            let mut name = String::new();
             let mut script = String::new();
-            let mut adminlevel = ADMIN_NO;
+            let mut adminlevel = AdminLevel::No;
             let mut concommandns = String::new();
             let mut maps_included = String::new();
             let mut maps_excluded = String::new();
@@ -215,10 +282,8 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
             let start = i;
             i += 1; // move past "plugin"
 
-            while i < lines.len() && !lines[i].trim().starts_with( '}' )
+            while i < lines.len() && let inner_line = lines[i].trim() && !inner_line.trim().starts_with( '}' )
             {
-                let inner_line = lines[i].trim();
-
                 if inner_line.starts_with( "\"name\"" ) 
                 {
                     name = inner_line.split( '"' ).nth( 3 ).unwrap_or( "" ).to_string();
@@ -230,7 +295,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 else if inner_line.starts_with( "\"adminlevel\"" ) 
                 {
                     let level = inner_line.split( '"' ).nth( 3 ).unwrap_or( "0" );
-                    adminlevel = level.parse::<i8>().unwrap_or( 0 );
+                    adminlevel = AdminLevel::from( level.parse::<isize>().unwrap_or( 0 ) );
                 }
                 else if inner_line.starts_with( "\"concommandns\"" ) 
                 {
@@ -284,18 +349,18 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
     plugins
 }
 
-pub fn save_plugins(plugins: &HashMap<String, PluginEntry>) -> Result<(), io::Error>
+pub fn save_plugins(ctx: &PluginContext) -> Result<(), io::Error>
 {
     let mut enabled_plugins = String::new();
     let mut disabled_plugins = String::new();
 
-    for plugin in plugins.values()
+    for plugin in ctx.plugins.values()
     {
         match plugin.state
         {
             PluginState::Enabled => enabled_plugins.push_str( &plugin.write_plugin() ),
             PluginState::Disabled => disabled_plugins.push_str( &plugin.write_plugin() ),
-            PluginState::Removed => (),// ignore removed plugins
+            PluginState::Removed => { }// ignore removed plugins
         }
     }
 
@@ -304,11 +369,11 @@ pub fn save_plugins(plugins: &HashMap<String, PluginEntry>) -> Result<(), io::Er
     match store.svencoopdir
     {
         Some( dir ) => PathBuf::from( dir ),
-        None => std::env::current_dir().unwrap_or_default(),// ??? Theoretically should never happen.
+        None => env::current_dir().unwrap_or( PathBuf::from( "." ) )
     };
 
-    fs::write( path.join( FILENAME_PLUGINS ), format!( "\"plugins\"\n{{{}}}", enabled_plugins ), )?;
-    fs::write( path.join( FILENAME_DISABLED_PLUGINS ),format!( "\"disabled_plugins\"\n{{{}}}", disabled_plugins ), )?;
+    fs::write( path.join( FILENAME_PLUGINS ), format!( "\"plugins\"\n{{{}}}", enabled_plugins ) )?;
+    fs::write( path.join( FILENAME_DISABLED_PLUGINS ),format!( "\"disabled_plugins\"\n{{{}}}", disabled_plugins ) )?;
 
     Ok( () )
 }

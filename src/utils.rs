@@ -1,5 +1,5 @@
 /*
-	Sven Co-op Plugin Manager Version 1.0
+	Sven Co-op Plugin Manager Version 2.0
 
 Copyright (C) 2025 Outerbeast
 This program is free software: you can redistribute it and/or modify
@@ -15,80 +15,78 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
-extern crate native_windows_gui as nwg;
-use std::
+use std::path::{ Path, PathBuf };
+
+#[macro_export]
+macro_rules! alloc_shared// Shared, mutable heap allocation (Rc<RefCell<T>>).
 {
-    path::
+    ( $value:expr ) =>
     {
-        Path,
-        PathBuf
-    }
-};
+        std::rc::Rc::new( std::cell::RefCell::new( $value ) )
+    };
+}
+#[macro_export]
+macro_rules! alloc_locked
+{
+    ($value:expr) =>
+    {
+        std::sync::Arc::new( std::sync::Mutex::new( $value ) )
+    };
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system"
+{
+    fn AllocConsole() -> i32;
+    fn FreeConsole() -> i32;
+}
+
+#[cfg(target_os = "windows")]
+pub fn open_terminal()
+{
+    unsafe { AllocConsole(); }
+}
+
+#[cfg(target_os = "windows")]
+pub fn close_terminal()
+{
+    unsafe { FreeConsole(); }
+}
 // Searches all drives for a specific filename, returns the path to that file
-pub fn search_drives(file_name: &str) -> PathBuf
+pub fn search_drives(file_name: &str) -> Option<PathBuf>
 {
     if file_name.trim().is_empty()
     {
-        return PathBuf::new();
+        return None;
     }
 
-    let mut results: Vec<PathBuf> = Vec::new();
-
-    for c in 'A'..='Z'
+    for d in 'A'..='Z'
     {
-        let drive = format!( "{}:/", c );
+        let drive = format!( "{}:/", d );
         let root = Path::new( &drive );
 
-        if root.exists() && root.is_dir()
+        if !root.exists() || !root.is_dir()
         {
-            let walker = 
+            continue;
+        }
+
+        let mut walker =
             walkdir::WalkDir::new( root )
-                .max_depth( 10 )
-                .into_iter()
-                .filter_entry( |e|
-                {
-                    let name = e.file_name().to_string_lossy();
-                    !name.eq_ignore_ascii_case( "$Recycle.Bin" )
-                })
-                .filter_map( Result::ok )
-                .filter( |e| e.file_name().to_string_lossy().eq_ignore_ascii_case( file_name ) );
-
-            for entry in walker
+            .max_depth( 10 )
+            .into_iter()
+            .filter_entry( |e|
             {
-                results.push( entry.path().to_path_buf() );
-            }
+                let name = e.file_name().to_string_lossy();
+                !name.eq_ignore_ascii_case( "$Recycle.Bin" )
+            })
+            .filter_map( Result::ok )
+            .filter( |e| e.file_name().to_string_lossy().eq_ignore_ascii_case( file_name ) );
+
+        if let Some( entry ) = walker.next()
+        {
+            return Some( entry.path().to_path_buf() );
         }
     }
 
-    match results.is_empty()
-    {
-        true => PathBuf::new(),
-        false => results[0].clone(),
-    }
-}
-/// Show a one-off Open file dialog parented to `parent`.
-/// Returns Some(path) when the user selects a file, None when cancelled.
-pub fn open_file_dialog(parent: &nwg::Window) -> Option<PathBuf>
-{
-    let mut dlg = nwg::FileDialog::default();
-    nwg::FileDialog::builder()
-        .title( "Select plugin file" )
-        .action( nwg::FileDialogAction::Open )
-        .multiselect( false )
-        .filters( "Plugins (*.as)|All files (*.*)" )
-        .build( &mut dlg )
-    .unwrap_or_default();
-    // run(parent) blocks until the dialog closes; returns bool
-    if dlg.run( Some( parent ) )
-    {
-        match dlg.get_selected_item()
-        {
-            Ok( os ) => Some( PathBuf::from( os ) ),
-            Err( _ ) => None
-        }
-    }
-    else 
-    {
-        None
-    }
+    None
 }

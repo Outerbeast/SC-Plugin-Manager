@@ -25,4 +25,3 @@ CertUtil -hashfile "%~dp0%BIN_NAME%.exe" SHA256 > "%~dp0%BIN_NAME%.exe.sha256.tx
 echo Build complete. The executable is located at %DEST%\%BIN_NAME%.exe
 type "%~dp0%BIN_NAME%.exe.sha256.txt"
 endlocal
-pause

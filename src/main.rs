@@ -1,5 +1,5 @@
 /*
-	Sven Co-op Plugin Manager Version 1.0
+	Sven Co-op Plugin Manager Version 2.0
 
 Copyright (C) 2025 Outerbeast
 This program is free software: you can redistribute it and/or modify
@@ -15,21 +15,23 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
-#![windows_subsystem = "windows"]
+#![cfg_attr( target_os = "windows", windows_subsystem = "windows" )]
+
+slint::include_modules!();
 
 pub mod driver;
 pub mod config;
 pub mod plugin;
 pub mod utils;
-pub mod gui;
+pub mod app;
 
-pub const APPNAME: &str = "SCPluginManager";
+pub const APPNAME: &str = env!( "CARGO_PKG_NAME" );
 
 fn main() -> std::process::ExitCode
 {
     match driver::run()
     {
-        Ok( _ ) =>
+        Ok( () ) =>
         {
             println!( "Application ran successfully." );
             std::process::ExitCode::SUCCESS

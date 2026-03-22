@@ -1,5 +1,5 @@
 /*
-	Sven Co-op Plugin Manager Version 1.0
+	Sven Co-op Plugin Manager Version 2.0
 
 Copyright (C) 2025 Outerbeast
 This program is free software: you can redistribute it and/or modify
@@ -23,48 +23,53 @@ use std::
     path::PathBuf
 };
 
-use crate::gui::window::message_box;
+use crate::
+{
+    APPNAME, plugin::
+    {
+        FILENAME_DISABLED_PLUGINS,
+        FILENAME_PLUGINS
+    },
+    utils
+};
+use crate::utils::{close_terminal, open_terminal};
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
+#[derive( Debug, Default, serde::Serialize, serde::Deserialize )]
 pub struct Config
 {
-    pub svencoopdir: Option<String>,
+    pub svencoopdir: Option<String>
 }
 
 fn appdata_base() -> PathBuf 
 {
     if let Ok( local ) = env::var( "LOCALAPPDATA" ) 
     {
-        PathBuf::from( local ).join( crate::APPNAME )
+        PathBuf::from( local ).join( APPNAME )
     } 
     else if let Ok( appdata ) = env::var( "APPDATA" ) 
     {
-        PathBuf::from( appdata ).join( crate::APPNAME )
+        PathBuf::from( appdata ).join( APPNAME )
     } 
     else 
-    {
-        std::env::current_dir().unwrap().join( crate::APPNAME )
+    {   // Use path where we are running from
+        env::current_dir().unwrap_or( PathBuf::from( "." ) ).join( APPNAME )
     }
 }
 
 fn config_path() -> PathBuf
 {
-    appdata_base().join( format!( "{}.toml", crate::APPNAME ) )
+    appdata_base().join( format!( "{}.toml", APPNAME ) )
 }
 
 pub fn read_store() -> Result<Config, io::Error>
 {
-    let p = config_path();
-    
-    if !p.exists()
-    { 
-        return Ok( Config::default() );
+    match fs::read_to_string( &config_path() )
+    {
+        Ok( s ) => toml::from_str( &s ).map_err( io::Error::other ),
+        // Forgot why I returned Config::default() here.
+        Err( e ) if e.kind() == io::ErrorKind::NotFound => Ok( Config::default() ),
+        Err( e ) => Err( e )
     }
-
-    let s = fs::read_to_string( p )?;
-    let conf: Config = toml::from_str( &s ).map_err( io::Error::other )?;
-    
-    Ok( conf )
 }
 
 fn write_store(st: &Config) -> Result<(), io::Error>
@@ -72,28 +77,13 @@ fn write_store(st: &Config) -> Result<(), io::Error>
     fs::create_dir_all( appdata_base() )?;
 
     let p = config_path();
-    let tmp = p.with_extension( "toml.tmp" );
+    let buf = p.with_extension( "toml.tmp" );
     let s = toml::to_string_pretty( st ).map_err( io::Error::other )?;
 
-    fs::write( &tmp, s.as_bytes() )?;
-    fs::rename( &tmp, &p )?;
+    fs::write( &buf, s.as_bytes() )?;
+    fs::rename( &buf, &p )?;
     
     Ok(())
-}
-// Initialise: check TOML, otherwise discover svencoop.exe and seed plugin files.
-// Returns the svencoop folder path.
-fn search_install() -> PathBuf
-{
-    let exe_path = crate::utils::search_drives( "svencoop.exe" );
-
-    if exe_path.exists()
-    {
-        exe_path.with_file_name( "svencoop" )
-    }
-    else
-    {
-        PathBuf::new()
-    }
 }
 
 pub fn init() -> io::Result<PathBuf>
@@ -103,26 +93,36 @@ pub fn init() -> io::Result<PathBuf>
         return Ok( PathBuf::from( dir ) );
     }
     // Initial setup
-    let splash = crate::gui::window::show_wait_splash();
-    let exe_path = env::current_dir().unwrap_or_default();// If the plugin file exists in the current dir, just use that.
+    #[cfg( target_os = "windows" )] open_terminal();
+    println!("Initial setup, please wait...");
+
+    let exe_path = env::current_dir().unwrap_or( PathBuf::from( "." ) );// If the plugin file exists in the current dir, just use that.
     let svencoop_dir =
-    match exe_path.join( crate::plugin::FILENAME_PLUGINS ).exists()
+    match exe_path.join( FILENAME_PLUGINS ).exists()
     {
         true => exe_path,
-        false => search_install(),
+        false =>// Doesn't exist, look for it
+        {
+            utils::search_drives( "svencoop.exe" )
+                .unwrap_or( PathBuf::from( "." ) )
+                .with_extension( "" )// drops the extension
+        }
     };
 
     if !svencoop_dir.exists()
     {
-        splash.close();
-        return Err( io::Error::new( io::ErrorKind::NotFound, "No directory exists." ) );
+        let s_err = "No directory to svencoop exists.";
+        eprintln!( "{}", s_err );
+        #[cfg( target_os = "windows" )] close_terminal();
+
+        return Err( io::Error::new( io::ErrorKind::NotFound, s_err ) );
     }
     // Ensure plugin files exist - redundant for default_plugins.txt if the app was directly installed
-    let enabled_file = svencoop_dir.join( crate::plugin::FILENAME_PLUGINS );
-    let disabled_file = svencoop_dir.join( crate::plugin::FILENAME_DISABLED_PLUGINS );
-
+    let enabled_file = svencoop_dir.join( FILENAME_PLUGINS );
+    let disabled_file = svencoop_dir.join( FILENAME_DISABLED_PLUGINS );
+    
     if !enabled_file.exists()
-    { 
+    {
         fs::write( &enabled_file, b"" )?;
     }
 
@@ -131,14 +131,8 @@ pub fn init() -> io::Result<PathBuf>
         fs::write( &disabled_file, b"" )?;
     }
     // Save folder path into TOML
-    if let Err( e ) = write_store( &Config { svencoopdir: Some( svencoop_dir.to_string_lossy().into_owned() ) } )
-    {
-        message_box( "Error",
-            format!( "Failed to save config.\nReason: {}", e ).as_str(),
-            native_windows_gui::MessageButtons::Ok,
-            native_windows_gui::MessageIcons::Error );
-    };
-    
-    splash.close();
+    write_store( &Config { svencoopdir: Some( svencoop_dir.to_string_lossy().into_owned() ) } )?;
+    #[cfg( target_os = "windows" )] close_terminal();
+
     Ok( svencoop_dir )
 }

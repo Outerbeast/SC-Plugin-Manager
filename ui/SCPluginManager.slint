@@ -1,0 +1,229 @@
+/*
+	Sven Co-op Plugin Manager Version 2.0
+
+Copyright (C) 2025 Outerbeast
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+*/
+import { StandardListView, LineEdit, Button, ComboBox, CheckBox, TextEdit, StandardButton } from "std-widgets.slint";
+
+export component PluginManagerWindow inherits Window {
+    icon: @image-url( "icon.ico" );// !-ISSUE-!: icon does not show in the app window title
+    width: 640px;
+    height: 440px;
+    title: "Sven Co-op Plugin Manager";
+    
+    in-out property <string> txt-name: "";
+    in-out property <string> txt-script: "";
+    in-out property <string> txt-concommandns: "";
+    in-out property <string> txt-maps-included: "";
+    in-out property <string> txt-maps-excluded: "";
+    in-out property <int> cb-adminlevel: 0;
+    in-out property <bool> chk-enabled: false;
+    in-out property <[StandardListViewItem]> plugin-list: [];
+    in-out property <int> selected-plugin-index: -1;
+
+    callback add-clicked();
+    callback remove-clicked();
+    callback apply-clicked();
+    callback save-clicked();
+    callback plugin-selected(int);
+    callback enabled-toggled(bool);
+    
+    GridLayout {
+        spacing: 8px;
+        padding: 10px;
+        
+        // Row 0: Plugin List (spans 1 column, left side)
+        StandardListView {
+            row: 0;
+            col: 0;
+            width: 200px;
+            height: 410px;
+            model <=> root.plugin-list;
+            current-item <=> root.selected-plugin-index;
+            
+            current-item-changed(index) => {
+                if index >= 0 {
+                    root.plugin-selected(index);
+                }
+            }
+        }
+        
+        // Right side panel (spans from column 1)
+        VerticalLayout {
+            row: 0;
+            col: 1;
+            spacing: 6px;
+            
+            // Name field
+            HorizontalLayout {
+                spacing: 5px;
+                Text { text: "Name"; vertical-alignment: center; min-width: 80px; }
+                LineEdit {
+                    text <=> root.txt-name;
+                    horizontal-stretch: 1;
+                }
+            }
+            
+            // Script field  
+            HorizontalLayout {
+                spacing: 5px;
+                Text { text: "Script"; vertical-alignment: center; min-width: 80px; }
+                LineEdit {
+                    text <=> root.txt-script;
+                    horizontal-stretch: 1;
+                }
+            }
+            
+            // Command NS field
+            HorizontalLayout {
+                spacing: 5px;
+                Text { text: "Command NS"; vertical-alignment: center; min-width: 80px; }
+                LineEdit {
+                    text <=> root.txt-concommandns;
+                    horizontal-stretch: 1;
+                }
+            }
+            
+            // Admin Level
+            HorizontalLayout {
+                spacing: 5px;
+                Text { text: "Admin Level"; vertical-alignment: center; min-width: 80px; }
+                ComboBox {
+                    horizontal-stretch: 1;
+                    current-index <=> root.cb-adminlevel;
+                    model: ["0: All", "1: Players", "2: Admins", "3: Server Owner"];
+                }
+            }
+            
+            // Maps Included
+            HorizontalLayout {
+                spacing: 2px;
+                Text { 
+                    text: "Included Maps ";
+                    vertical-alignment: top;
+                }
+                TextEdit {
+                    text <=> root.txt-maps-included;
+                    height: 60px;
+                    horizontal-stretch: 1;
+                }
+            }
+            
+            // Maps Excluded
+            HorizontalLayout {
+                spacing: 2px;
+                Text { 
+                    text: "Excluded Maps";
+                    vertical-alignment: top;
+                }
+                TextEdit {
+                    text <=> root.txt-maps-excluded;
+                    height: 60px;
+                    horizontal-stretch: 1;
+                }
+            }
+            
+            // Bottom buttons and checkbox
+            HorizontalLayout {
+                spacing: 8px;
+                
+                CheckBox {
+                    text: "Enabled";
+                    checked <=> root.chk-enabled;
+                    toggled => {
+                        root.enabled-toggled(root.chk-enabled);
+                    }
+                }
+                
+                Button {
+                    text: "Add new";
+                    clicked => { root.add-clicked(); }
+                }
+                Button {
+                    text: "Remove";
+                    clicked => { root.remove-clicked(); }
+                }
+                Button {
+                    text: "Apply";
+                    clicked => { root.apply-clicked(); }
+                }
+                Button {
+                    text: "Save";
+                    clicked => { root.save-clicked(); }
+                }
+            }
+        }
+    }
+}
+
+export component MessageDialog inherits Window {
+    in property <string> message-title: "";
+    in property <string> message-text: "";
+    in property <string> icon-text: "ℹ️";
+    in property <int> buttons: 1; // 0=None, 1=Ok, 2=OkCancel, 3=YesNo, 4=YesNoCancel, 5=RetryCancel
+    
+    out property <int> result: 1;
+    
+    callback close-dialog(int);
+    
+    close-dialog(result) => { root.result = result; }
+    
+    width: 380px;
+    height: 160px;
+    title: message-title;
+    always-on-top: true;
+    
+    VerticalLayout {
+        padding: 15px;
+        spacing: 10px;
+        
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: center;
+            
+            Text {
+                text: icon-text;
+                font-size: 32px;
+                vertical-alignment: center;
+            }
+            
+            VerticalLayout {
+                spacing: 5px;
+                
+                Text {
+                    text: message-text;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+        
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: center;
+            
+            if buttons == 1 : Button { text: "OK"; clicked => { root.close-dialog(1); } }
+            if buttons == 2 : Button { text: "OK"; clicked => { root.close-dialog(1); } }
+            if buttons == 2 : Button { text: "Cancel"; clicked => { root.close-dialog(0); } }
+            if buttons == 3 : Button { text: "Yes"; clicked => { root.close-dialog(1); } }
+            if buttons == 3 : Button { text: "No"; clicked => { root.close-dialog(2); } }
+            if buttons == 4 : Button { text: "Yes"; clicked => { root.close-dialog(1); } }
+            if buttons == 4 : Button { text: "No"; clicked => { root.close-dialog(2); } }
+            if buttons == 4 : Button { text: "Cancel"; clicked => { root.close-dialog(0); } }
+            if buttons == 5 : Button { text: "Retry"; clicked => { root.close-dialog(1); } }
+            if buttons == 5 : Button { text: "Cancel"; clicked => { root.close-dialog(0); } }
+        }
+    }
+}
