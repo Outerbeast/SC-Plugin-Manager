@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -24,6 +27,6 @@ jobs:
         with:
           files: |
             *.exe
-            *.sha256
+            *.sha256.txt
           draft: true
           generate_release_notes: true
