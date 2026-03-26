@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 use std::
 {
-    env,
     fs,
     io,
     collections::HashMap,
@@ -25,15 +24,16 @@ use std::
     path::{ Path, PathBuf }
 };
 
-use num_enum::{ FromPrimitive, IntoPrimitive };
+use crate::config::SVENCOOP_PATH;
 
 pub const FILENAME_PLUGINS: &str = "default_plugins.txt";
 pub const FILENAME_DISABLED_PLUGINS: &str = "disabled_plugins.txt";
-
+pub const PLUGINS_DIR: &str = "scripts/plugins";
+pub const SCRIPT_EXT: &str = "as";
 pub const CHECKED: &str = "✔";
 pub const UNCHECKED: &str = "☐";
 
-#[derive( Debug, Default, Clone, Copy, FromPrimitive, IntoPrimitive )]
+#[derive( Debug, Default, Clone, Copy )]
 #[repr(isize)]
 pub enum AdminLevel// straight from AdminLevel_t: https://sven-coop.github.io/AdminLevel_t
 {
@@ -43,6 +43,29 @@ pub enum AdminLevel// straight from AdminLevel_t: https://sven-coop.github.io/Ad
     No,// Not an administrator
     Yes,// Not an administrator
     Owner// Server owner (applies to a listenserver host player)
+}
+
+impl From<isize> for AdminLevel
+{
+    fn from(value: isize) -> Self
+    {
+        match value
+        {
+            -1 => AdminLevel::Init,
+            0 => AdminLevel::No,
+            1 => AdminLevel::Yes,
+            2 => AdminLevel::Owner,
+            _ => AdminLevel::No
+        }
+    }
+}
+
+impl From<AdminLevel> for isize
+{
+    fn from(level: AdminLevel) -> Self
+    {
+        level as isize
+    }
 }
 
 #[derive( Debug, Clone, PartialEq )]
@@ -142,7 +165,7 @@ impl PluginEntry
             maps_included: String::new(),
             maps_excluded: String::new(),
             start: 0,
-            end: 0,
+            end: 0
         }
     }
 
@@ -150,16 +173,42 @@ impl PluginEntry
     {
         self.state = self.state.toggle();
     }
-    // !-TODO-!: need to get the path to the svencoop install again to check if the given script is there or not
-/*     pub fn validate_plugin_install(&self) -> bool
+
+    pub fn validate_plugin_install(&self) -> bool
     {
-        false
+        Self::validate_script_install( &self.script.clone() )
     }
 
-    pub fn validate_script_install(script: &str) -> bool
+    fn validate_script_install(script: &str) -> bool
     {
+        let svencoop_path = SVENCOOP_PATH.get().expect( "SVENCOOP_PATH missing" );
+        // Base folder - "Sven Co-op/svencoop/scripts/plugins"
+        let base_path = svencoop_path
+            .join( PLUGINS_DIR )
+            .join( script )
+            .with_extension( SCRIPT_EXT );
+        // Check main plugins folder first
+        if base_path.is_file()
+        {
+            #[cfg(debug_assertions)] println!( "{:?} - Valid?: true ", base_path );
+            return true;
+        }
+        // Check addons folder - "Sven Co-op/svencoop_addon/scripts/plugins"
+        if let Some( parent ) = svencoop_path.parent()
+        {
+            let addon_path = parent
+                .join( "svencoop_addon" )
+                .join( PLUGINS_DIR )
+                .join( script )
+                .with_extension( SCRIPT_EXT );
+
+            #[cfg(debug_assertions)] println!( "{:?} - Valid?: {}", addon_path, addon_path.is_file() );
+
+            return addon_path.is_file();
+        }
+
         false
-    } */
+    }
     // New plugin entry, name and script are required minimum fields, returns (key, Plugin) tuple
     // Maybe this should be a Plugin constructor instead?
     pub fn add_plugin(name: &str, script: &str) -> (String, Self)
@@ -169,7 +218,7 @@ impl PluginEntry
 
         if name_trim.is_empty() || script_trim.is_empty()
         {
-            println!( "Plugin name and script cannot be empty." );
+            #[cfg(debug_assertions)] println!( "Plugin name and script cannot be empty." );
             return ( String::new(), PluginEntry::new( "", "" ) );
         }
 
@@ -295,7 +344,7 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
                 else if inner_line.starts_with( "\"adminlevel\"" ) 
                 {
                     let level = inner_line.split( '"' ).nth( 3 ).unwrap_or( "0" );
-                    adminlevel = AdminLevel::from( level.parse::<isize>().unwrap_or( 0 ) );
+                    adminlevel = AdminLevel::from( level.parse::<_>().unwrap_or( 0 ) );
                 }
                 else if inner_line.starts_with( "\"concommandns\"" ) 
                 {
@@ -348,11 +397,12 @@ pub fn load_plugins(text: &str, state: PluginState) -> HashMap<String, PluginEnt
 
     plugins
 }
-
-pub fn save_plugins(ctx: &PluginContext) -> Result<(), io::Error>
+// Returns missing plugins as a list, if any
+pub fn save_plugins(ctx: &PluginContext) -> Result<String, io::Error>
 {
     let mut enabled_plugins = String::new();
     let mut disabled_plugins = String::new();
+    let mut missing_plugins = String::new();
 
     for plugin in ctx.plugins.values()
     {
@@ -360,20 +410,22 @@ pub fn save_plugins(ctx: &PluginContext) -> Result<(), io::Error>
         {
             PluginState::Enabled => enabled_plugins.push_str( &plugin.write_plugin() ),
             PluginState::Disabled => disabled_plugins.push_str( &plugin.write_plugin() ),
-            PluginState::Removed => { }// ignore removed plugins
+            PluginState::Removed => continue// ignore removed plugins
+        }
+
+        if !plugin.validate_plugin_install()
+        {
+            missing_plugins.push_str( &format!( "\n{}", &plugin.name ) );
         }
     }
 
-    let store = crate::config::read_store()?;
-    let path = 
-    match store.svencoopdir
+    let path = SVENCOOP_PATH.get().ok_or_else( ||
     {
-        Some( dir ) => PathBuf::from( dir ),
-        None => env::current_dir().unwrap_or( PathBuf::from( "." ) )
-    };
+        io::Error::other( "SVENCOOP_PATH not set" )
+    })?;
 
     fs::write( path.join( FILENAME_PLUGINS ), format!( "\"plugins\"\n{{{}}}", enabled_plugins ) )?;
     fs::write( path.join( FILENAME_DISABLED_PLUGINS ),format!( "\"disabled_plugins\"\n{{{}}}", disabled_plugins ) )?;
 
-    Ok( () )
+    Ok( missing_plugins )
 }

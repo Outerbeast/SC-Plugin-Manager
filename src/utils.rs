@@ -1,5 +1,5 @@
 /*
-	Sven Co-op Plugin Manager Version 2.0
+    Sven Co-op Plugin Manager Version 2.0
 
 Copyright (C) 2025 Outerbeast
 This program is free software: you can redistribute it and/or modify
@@ -15,10 +15,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
-use std::path::{ Path, PathBuf };
+use std::path::PathBuf;
 
 #[macro_export]
-macro_rules! alloc_shared// Shared, mutable heap allocation (Rc<RefCell<T>>).
+macro_rules! alloc_shared
 {
     ( $value:expr ) =>
     {
@@ -44,13 +44,19 @@ unsafe extern "system"
 #[cfg(target_os = "windows")]
 pub fn open_terminal()
 {
-    unsafe { AllocConsole(); }
+    unsafe
+    {
+        AllocConsole();
+    }
 }
 
 #[cfg(target_os = "windows")]
 pub fn close_terminal()
 {
-    unsafe { FreeConsole(); }
+    unsafe
+    {
+        FreeConsole();
+    }
 }
 // Searches all drives for a specific filename, returns the path to that file
 pub fn search_drives(file_name: &str) -> Option<PathBuf>
@@ -60,31 +66,74 @@ pub fn search_drives(file_name: &str) -> Option<PathBuf>
         return None;
     }
 
-    for d in 'A'..='Z'
+    #[cfg(target_os = "windows")]
     {
-        let drive = format!( "{}:/", d );
-        let root = Path::new( &drive );
-
-        if !root.exists() || !root.is_dir()
+        for d in 'A'..='Z'
         {
-            continue;
-        }
+            let drive = format!("{}:/", d);
+            let root = std::path::Path::new( &drive );
 
-        let mut walker =
-            walkdir::WalkDir::new( root )
-            .max_depth( 10 )
-            .into_iter()
-            .filter_entry( |e|
+            if !root.exists() || !root.is_dir()
             {
-                let name = e.file_name().to_string_lossy();
-                !name.eq_ignore_ascii_case( "$Recycle.Bin" )
-            })
-            .filter_map( Result::ok )
-            .filter( |e| e.file_name().to_string_lossy().eq_ignore_ascii_case( file_name ) );
+                continue;
+            }
 
-        if let Some( entry ) = walker.next()
+            let mut walker = walkdir::WalkDir::new( root )
+                .max_depth( 12 )
+                .into_iter()
+                .filter_entry( |e|
+                {
+                    let name = e.file_name().to_string_lossy();
+                    !name.eq_ignore_ascii_case( "$Recycle.Bin" )
+                })
+                .filter_map(Result::ok)
+                .filter( |e|
+                {
+                    e.file_name().to_string_lossy().eq_ignore_ascii_case( file_name )
+                });
+
+            if let Some( entry ) = walker.next()
+            {
+                return Some( entry.path().to_path_buf() );
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let search_paths: Vec<PathBuf> = vec!
+        [
+            PathBuf::from( "/" ),
+            dirs::home_dir()
+                .map( |p| p.join( ".steam" ).join( "steam" ) )
+                .unwrap_or_default(),
+            PathBuf::from( "/mnt" ),
+            PathBuf::from( "/opt" ),
+            PathBuf::from( "/usr" ).join( "games" ),
+        ];
+
+        for root in search_paths
         {
-            return Some( entry.path().to_path_buf() );
+            if !root.exists() || !root.is_dir()
+            {
+                continue;
+            }
+
+            let mut walker = walkdir::WalkDir::new( &root )
+                .max_depth( 12 )
+                .into_iter()
+                .filter_entry( |e|
+                {
+                    let name = e.file_name().to_string_lossy();
+                    !name.starts_with('.')
+                })
+                .filter_map( Result::ok )
+                .filter( |e| e.file_name().to_string_lossy() == file_name );
+
+            if let Some(entry) = walker.next()
+            {
+                return Some( entry.path().to_path_buf() );
+            }
         }
     }
 

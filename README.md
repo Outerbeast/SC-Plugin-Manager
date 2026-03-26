@@ -22,11 +22,12 @@ Sven Co-op Plugin Manager — a small Windows GUI utility to view and manage Sve
 
 When a plugin is selected, you can configure its behavior:
 - `Name`: Display name of the plugin.
-- `Script`: Path and filename (without `.as` extension) for the plugin script. The path begins from `scripts/plugins`.
+- `Script`: Path and filename (without `.as` extension) for the plugin script. The path begins from `scripts/plugins` within the `svencoop_addon` folder.<br>
+You can click this to select a different plugin script file.
 
 Optional fields:
 - `Command NS`: Namespace prefix for plugin commands.
-- `Admin Level`: Choose required access level from the dropdown.
+- `Admin Level`: Choose a required access level from the dropdown.
 - `Included Maps`: List of maps where the plugin is active.
 - `Excluded Maps`: List of maps where the plugin is disabled.
 
@@ -37,8 +38,9 @@ Optional fields:
 - `Apply`: Applies changes to the current plugin.
 - `Save`: Save all changes to plugins. This will exit the application.
 
-When a plugin is added, the script file be installed to `svencoop_addon/scripts/plugins`.
-When a plugin is removed, it will no longer be present in your `default_plugins.txt` file. The plugin script will still be present in your game if you wish to reinstall it in the future.
+When a plugin is added, the script file be installed to `svencoop_addon/scripts/plugins`.<br>
+When a plugin is removed, it will no longer be present in your `default_plugins.txt` file. The plugin script will still be present in your game if you wish to reinstall it in the future.<br>
+When `X` is clicked, the app will close and any changes made will not be saved.
 
 💡 Tips
 - Use the `Apply` button before switching plugins to avoid losing changes.
@@ -81,7 +83,7 @@ rustup target add x86_64-pc-windows-msvc
 
 ```cmd
 git clone https://github.com/Outerbeast/SC-Plugin-Manager
-cd SC-Plugin-Manager
+cd yourproject
 ```
 
 2. Run the build script:
@@ -100,4 +102,4 @@ If you have feedback or encounter issues, please open an issue on [GitHub Issues
 Outerbeast - Author
 
 ### Special Thanks
-Thanks to the [Native Windows GUI](https://github.com/gabdube/native-windows-gui) project for providing a Rust library to build native Windows applications.
+User interface powered by [Slint](https://slint.dev/)™️

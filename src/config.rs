@@ -20,7 +20,8 @@ use std::
     env,
     fs,
     io,
-    path::PathBuf
+    path::PathBuf,
+    sync::OnceLock
 };
 
 use crate::
@@ -32,8 +33,9 @@ use crate::
     },
     utils
 };
-use crate::utils::{close_terminal, open_terminal};
 
+pub static SVENCOOP_PATH: OnceLock<PathBuf> = OnceLock::new();
+// struct only for housing serialised data
 #[derive( Debug, Default, serde::Serialize, serde::Deserialize )]
 pub struct Config
 {
@@ -42,18 +44,36 @@ pub struct Config
 
 fn appdata_base() -> PathBuf 
 {
-    if let Ok( local ) = env::var( "LOCALAPPDATA" ) 
+    #[cfg(target_os = "windows")]
     {
-        PathBuf::from( local ).join( APPNAME )
-    } 
-    else if let Ok( appdata ) = env::var( "APPDATA" ) 
-    {
-        PathBuf::from( appdata ).join( APPNAME )
-    } 
-    else 
-    {   // Use path where we are running from
-        env::current_dir().unwrap_or( PathBuf::from( "." ) ).join( APPNAME )
+        if let Ok( local ) = env::var( "LOCALAPPDATA" )
+        {
+            return PathBuf::from( local ).join( APPNAME );
+        }
+
+        if let Ok( appdata ) = env::var( "APPDATA" )
+        {
+            return PathBuf::from( appdata ).join( APPNAME );
+        }
     }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some( config ) = env::var( "XDG_CONFIG_HOME" )
+            .ok()
+            .map( PathBuf::from )
+            .filter( |p| p.exists() )
+        {
+            return config.join( APPNAME );
+        }
+
+        if let Some( home ) = dirs::home_dir()
+        {
+            return home.join( ".config" ).join( APPNAME );
+        }
+    }
+
+    env::current_dir().unwrap_or( PathBuf::from( "." ) ).join( APPNAME )
 }
 
 fn config_path() -> PathBuf
@@ -63,7 +83,7 @@ fn config_path() -> PathBuf
 
 pub fn read_store() -> Result<Config, io::Error>
 {
-    match fs::read_to_string( &config_path() )
+    match fs::read_to_string( config_path() )
     {
         Ok( s ) => toml::from_str( &s ).map_err( io::Error::other ),
         // Forgot why I returned Config::default() here.
@@ -85,16 +105,16 @@ fn write_store(st: &Config) -> Result<(), io::Error>
     
     Ok(())
 }
-
-pub fn init() -> io::Result<PathBuf>
+// Returns the path to the plugins file
+pub fn init() -> Result<PathBuf, io::Error>
 {   // Load config first if its exists
     if let Ok( store ) = read_store() && let Some( dir ) = store.svencoopdir
     {
         return Ok( PathBuf::from( dir ) );
     }
     // Initial setup
-    #[cfg( target_os = "windows" )] open_terminal();
-    println!("Initial setup, please wait...");
+    #[cfg( target_os = "windows" )] crate::utils::open_terminal();
+    println!( "Initial setup, please wait..." );
 
     let exe_path = env::current_dir().unwrap_or( PathBuf::from( "." ) );// If the plugin file exists in the current dir, just use that.
     let svencoop_dir =
@@ -103,7 +123,7 @@ pub fn init() -> io::Result<PathBuf>
         true => exe_path,
         false =>// Doesn't exist, look for it
         {
-            utils::search_drives( "svencoop.exe" )
+            utils::search_drives( "sven-coop.fgd" )
                 .unwrap_or( PathBuf::from( "." ) )
                 .with_extension( "" )// drops the extension
         }
@@ -113,7 +133,7 @@ pub fn init() -> io::Result<PathBuf>
     {
         let s_err = "No directory to svencoop exists.";
         eprintln!( "{}", s_err );
-        #[cfg( target_os = "windows" )] close_terminal();
+        #[cfg( target_os = "windows" )] crate::utils::close_terminal();
 
         return Err( io::Error::new( io::ErrorKind::NotFound, s_err ) );
     }
@@ -132,7 +152,8 @@ pub fn init() -> io::Result<PathBuf>
     }
     // Save folder path into TOML
     write_store( &Config { svencoopdir: Some( svencoop_dir.to_string_lossy().into_owned() ) } )?;
-    #[cfg( target_os = "windows" )] close_terminal();
+    println!( "Sven Co-op path found: {}", svencoop_dir.to_string_lossy() );
+    #[cfg( target_os = "windows" )] crate::utils::close_terminal();
 
     Ok( svencoop_dir )
 }

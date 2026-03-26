@@ -22,7 +22,10 @@ const DESCRIPTION: &str = env!( "CARGO_PKG_DESCRIPTION" );
 
 fn main() -> std::io::Result<()>
 {
-    if let Err( e ) = slint_build::compile(format!( "ui/{}.slint", PRODUCT_NAME ) )
+    let config = slint_build::CompilerConfiguration::new().with_style( "cupertino-dark".into() );
+
+    if let Err(e) = 
+    slint_build::compile_with_config( format!( "ui/{}.slint", PRODUCT_NAME ), config )
     {
         eprintln!( "Failed to compile SCPluginManager.slint: {}", e );
         return Err( std::io::Error::other( e ) );
@@ -31,7 +34,7 @@ fn main() -> std::io::Result<()>
     #[cfg(windows)]
     {
         winresource::WindowsResource::new()
-            .set_icon( "ui/icon.ico" )
+            .set_icon( "ui/logo.ico" )
             .set( "ProductName", PRODUCT_NAME )
             .set( "ProductVersion", VERSION )
             .set( "FileDescription", DESCRIPTION )

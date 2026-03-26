@@ -18,7 +18,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import { StandardListView, LineEdit, Button, ComboBox, CheckBox, TextEdit, StandardButton } from "std-widgets.slint";
 
 export component PluginManagerWindow inherits Window {
-    icon: @image-url( "icon.ico" );// !-ISSUE-!: icon does not show in the app window title
+    default-font-size: 16px;
+    icon: @image-url("logo.png");
     width: 640px;
     height: 440px;
     title: "Sven Co-op Plugin Manager";
@@ -39,16 +40,18 @@ export component PluginManagerWindow inherits Window {
     callback save-clicked();
     callback plugin-selected(int);
     callback enabled-toggled(bool);
+    callback script-clicked();
     
     GridLayout {
         spacing: 8px;
         padding: 10px;
+        padding-left: 2px;
         
         // Row 0: Plugin List (spans 1 column, left side)
         StandardListView {
             row: 0;
             col: 0;
-            width: 200px;
+            width: 240px;
             height: 410px;
             model <=> root.plugin-list;
             current-item <=> root.selected-plugin-index;
@@ -60,16 +63,25 @@ export component PluginManagerWindow inherits Window {
             }
         }
         
-        // Right side panel (spans from column 1)
-        VerticalLayout {
+        // Divider
+        Rectangle {
             row: 0;
             col: 1;
+            width: 2px;
+            background: #0078D4;
+        }
+        
+        // Right side panel (spans from column 2)
+        VerticalLayout {
+            row: 0;
+            col: 2;
             spacing: 6px;
+            horizontal-stretch: 1;
             
             // Name field
             HorizontalLayout {
-                spacing: 5px;
-                Text { text: "Name"; vertical-alignment: center; min-width: 80px; }
+                spacing: 24px;
+                Text { text: "Name"; width: 120px; vertical-alignment: center; }
                 LineEdit {
                     text <=> root.txt-name;
                     horizontal-stretch: 1;
@@ -78,18 +90,19 @@ export component PluginManagerWindow inherits Window {
             
             // Script field  
             HorizontalLayout {
-                spacing: 5px;
-                Text { text: "Script"; vertical-alignment: center; min-width: 80px; }
-                LineEdit {
-                    text <=> root.txt-script;
+                spacing: 24px;
+                Text { text: "Script"; width: 120px; vertical-alignment: center; }
+                Button {
+                    text: root.txt-script;
                     horizontal-stretch: 1;
+                    clicked => { root.script-clicked(); }
                 }
             }
             
             // Command NS field
             HorizontalLayout {
-                spacing: 5px;
-                Text { text: "Command NS"; vertical-alignment: center; min-width: 80px; }
+                spacing: 24px;
+                Text { text: "Command NS"; width: 120px; vertical-alignment: center; }
                 LineEdit {
                     text <=> root.txt-concommandns;
                     horizontal-stretch: 1;
@@ -98,8 +111,8 @@ export component PluginManagerWindow inherits Window {
             
             // Admin Level
             HorizontalLayout {
-                spacing: 5px;
-                Text { text: "Admin Level"; vertical-alignment: center; min-width: 80px; }
+                spacing: 24px;
+                Text { text: "Admin Level"; width: 120px; vertical-alignment: center; }
                 ComboBox {
                     horizontal-stretch: 1;
                     current-index <=> root.cb-adminlevel;
@@ -109,9 +122,10 @@ export component PluginManagerWindow inherits Window {
             
             // Maps Included
             HorizontalLayout {
-                spacing: 2px;
+                spacing: 24px;
                 Text { 
                     text: "Included Maps ";
+                    width: 120px;
                     vertical-alignment: top;
                 }
                 TextEdit {
@@ -123,9 +137,10 @@ export component PluginManagerWindow inherits Window {
             
             // Maps Excluded
             HorizontalLayout {
-                spacing: 2px;
+                spacing: 24px;
                 Text { 
                     text: "Excluded Maps";
+                    width: 120px;
                     vertical-alignment: top;
                 }
                 TextEdit {
@@ -180,8 +195,10 @@ export component MessageDialog inherits Window {
     
     close-dialog(result) => { root.result = result; }
     
-    width: 380px;
-    height: 160px;
+    min-width: 300px;
+    max-width: 600px;
+    min-height: 120px;
+    max-height: 400px;
     title: message-title;
     always-on-top: true;
     
@@ -206,6 +223,7 @@ export component MessageDialog inherits Window {
                     text: message-text;
                     wrap: word-wrap;
                     horizontal-alignment: center;
+                    vertical-stretch: 1;
                 }
             }
         }

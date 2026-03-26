@@ -23,6 +23,8 @@ use std::
     rc::Rc
 };
 
+use rfd;
+
 use slint::
 {
     ComponentHandle,
@@ -34,7 +36,7 @@ use slint::
 
 use crate::
 {
-    config,
+    config::SVENCOOP_PATH,
     plugin::
     {
         PluginEntry,
@@ -75,7 +77,7 @@ pub(crate) fn refresh_plugin_list(app: &AppWindow, plugin_data: &Rc<RefCell<Plug
 {
     app.set_plugin_list( ModelRc::new( VecModel::from( make_plugin_list( &plugin_data.borrow().plugins ) ) ) );
 }
-// Event handlers for UI
+
 pub(crate) fn on_plugin_selected(index: i32, app: &AppWindow, plugin_data: &Rc<RefCell<PluginContext>>)
 {
     let data = plugin_data.borrow();
@@ -107,25 +109,61 @@ pub(crate) fn on_plugin_selected(index: i32, app: &AppWindow, plugin_data: &Rc<R
     }
 }
 
+pub(crate) fn on_script_clicked(app: &AppWindow)
+{
+    let parent = SVENCOOP_PATH
+        .get()
+        .expect( "SVENCOOP_PATH missing" )
+        .parent()
+        .expect( "missing parent" );
+
+    let addon_dir = parent.join( "svencoop_addon" ).join( "scripts/plugins" );
+
+    if let Some( path ) = rfd::FileDialog::new()
+        .set_directory( &addon_dir )
+        .add_filter( "Script Files", &["as"] )
+    .pick_file()
+    {
+        let path_str = path.to_string_lossy();
+        let search_forward = "/scripts/plugins/";
+        let search_backward = "\\scripts\\plugins\\";
+
+        let relative = path_str.find( search_forward )
+            .or_else( || path_str.find( search_backward ) )
+            .map( |pos|
+            {
+                let search =
+                if path_str.find( search_forward ).is_some()
+                {
+                    search_forward
+                }
+                else
+                {
+                    search_backward
+                };
+
+                let start = pos + search.len();
+                &path_str[start..path_str.len() - 3]
+            })
+        .unwrap_or( &path_str );
+
+        app.set_txt_script( relative.into() );
+    }
+}
+
 pub(crate) fn on_add_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginContext>>)
 {
-    let config =
-    match config::read_store()
-    {
-        Ok( cfg ) => cfg,
-        Err( e ) =>
-        {
-            popup("Error reading config",
-                  &format!( "Failed to obtain plugin config\nReason: {}", e ),
-                  "❌", PopupButtons::Ok );
-            return;
-        }
-    };
+    let parent = SVENCOOP_PATH
+        .get()
+        .expect( "SVENCOOP_PATH missing" )
+        .parent()
+        .expect( "missing parent" );
 
-    if let Some( svencoopdir ) = config.svencoopdir
-    && let Some( path ) = rfd::FileDialog::new()
+    let addon_dir = parent.join( "svencoop_addon" ).join( "scripts/plugins" );
+
+    if let Some( path ) = rfd::FileDialog::new()
+        .set_directory( &addon_dir )
         .add_filter( "Plugin scripts", &["as"] )
-        .add_filter( "All files", &["*"] )
     .pick_file()
     {
         let name = path.file_stem()
@@ -135,9 +173,12 @@ pub(crate) fn on_add_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginCon
 
         if name.trim().is_empty()
         {
-            popup("Invalid Plugin File",
-                  "Failed to extract plugin name from the selected file.",
-                  "❌", PopupButtons::Ok );
+            popup( "Invalid Plugin File",
+                "Failed to extract plugin name from the selected file.",
+                "❌",
+                PopupButtons::Ok,
+                |_| { } );
+
             return;
         }
 
@@ -145,17 +186,25 @@ pub(crate) fn on_add_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginCon
 
         if data.plugins.contains_key( &name )
         {
-            popup("Plugin Already Exists", "A plugin with this name already exists. Please choose a different name.", "❌", PopupButtons::Ok);
+            popup( "Plugin Already Exists",
+                "A plugin with this name already exists. Please choose a different name.",
+                "❌",
+                PopupButtons::Ok,
+                |_| { } );
+
             return;
         }
-        // Install the plugin first physically
+
         if let Err( e ) =
-            PluginEntry::install_plugin( &path.to_string_lossy(), &PathBuf::from( &svencoopdir ) )
+            PluginEntry::install_plugin( &path.to_string_lossy(), &PathBuf::from( SVENCOOP_PATH.get().unwrap() ) )
         {
-            popup("Install Error",
-                  &format!( "Failed to install plugin {}.\nReason:\n{}\n\n\
-                        You will need to manually add this file to the game.", name, e ),
-                  "❌", PopupButtons::Ok );
+            popup( "Install Error",
+                &format!(
+                "Failed to install plugin {}.\nReason:\n{}\n\n\
+                You will need to manually add this file to the game.", name, e ),
+                "❌",
+                PopupButtons::Ok,
+                |_| { } );
 
             return;
         }
@@ -169,12 +218,15 @@ pub(crate) fn on_add_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginCon
         data.plugins.insert( key.clone(), plugin );
 
         drop( data );
-        refresh_plugin_list(app, plugin_data);
+        refresh_plugin_list( app, plugin_data );
 
         if let Err( e ) = save_plugins( &plugin_data.borrow() )
         {
-            popup( "Save Error", &format!("Failed to save plugins.\nReason: {e}"),
-                  "❌", PopupButtons::Ok );
+            popup( "Save Error",
+                &format!( "Failed to save plugins.\nReason: {e}" ),
+                "❌",
+                PopupButtons::Ok,
+                |_| { } );
         }
     }
 }
@@ -192,20 +244,13 @@ pub(crate) fn on_remove_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<Plugin
 
     drop( data );
     
-    if popup("Confirm Remove",
-             &format!( "Are you sure you want to remove the plugin '{}'?", selected_name ),
-             "❓", PopupButtons::YesNo ) == 2
-    {
-        return;
-    }
-    
     let mut data = plugin_data.borrow_mut();
     
     if data.plugins.remove( &selected_name ).is_some()
     {
         data.selected_plugin_name = None;
         drop( data );
-        refresh_plugin_list(app, plugin_data);
+        refresh_plugin_list( app, plugin_data );
         
         app.set_txt_name( "".into() );
         app.set_txt_script( "".into() );
@@ -219,7 +264,7 @@ pub(crate) fn on_remove_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<Plugin
 
 pub(crate) fn on_apply_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginContext>>)
 {
-    let data = plugin_data.borrow();// <- should this be made mutable to start with?
+    let data = plugin_data.borrow();
 
     let selected_name =
     match data.selected_plugin_name.clone()
@@ -230,12 +275,16 @@ pub(crate) fn on_apply_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginC
     
     if !data.plugins.contains_key( &selected_name )
     {
-        popup("Plugin Not Found", "Selected plugin could not be found in the internal store.",
-              "❌", PopupButtons::Ok );
+        popup( "Plugin Not Found",
+            "Selected plugin could not be found in the internal store.",
+            "❌",
+            PopupButtons::Ok,
+            |_| { } );
+
         return;
     }
 
-    drop( data );// Release this as it cannot be borrowed twice!
+    drop( data );
 
     let mut plugins = plugin_data.borrow_mut();
     let mut plugin = plugins.plugins.remove( &selected_name )
@@ -254,25 +303,45 @@ pub(crate) fn on_apply_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginC
     
     drop( plugins );
     
-    refresh_plugin_list(app, plugin_data);
-    
-    if let Err( e ) = save_plugins( &plugin_data.borrow() )
-    {
-        popup("Save Error", &
-            format!( "Failed to save plugins.\nReason: {}", e), "❌", PopupButtons::Ok );
-    }
+    refresh_plugin_list( app, plugin_data );
 }
 
 pub(crate) fn on_save_clicked(app: &AppWindow, plugin_data: &Rc<RefCell<PluginContext>>) -> Result<(), PlatformError>
 {
     match save_plugins( &plugin_data.borrow() )
     {
-        Ok( () ) => popup("Success", "Plugins saved.", "ℹ️", PopupButtons::Ok ),
+        Ok( missing_plugins ) =>
+        {
+            match missing_plugins.is_empty()
+            {
+                true =>
+                {
+                    popup( "Saved",
+                          "All plugins are saved.",
+                          "ℹ️",
+                          PopupButtons::Ok,
+                          |_| { } )
+                }
+
+                false =>
+                {
+                    popup( "Saved",
+                          &format!( "Following plugins have missing script files:{}\n\n
+                          You will need to reinstall them.", missing_plugins ),
+                          "ℹ️",
+                          PopupButtons::Ok,
+                          |_| { } )
+                }
+            }
+        }
+
         Err( e ) =>
         {
-            popup("Error",
-                  &format!( "Failed to save changes to plugin.\nReason:{}", e ),
-                  "❌", PopupButtons::Ok );
+            popup( "Error",
+                &format!( "Failed to save changes to plugin.\nReason: {}", e ),
+                "❌",
+                PopupButtons::Ok,
+                |_| { } );
 
             return Err( PlatformError::Other( e.to_string() ) );
         }
