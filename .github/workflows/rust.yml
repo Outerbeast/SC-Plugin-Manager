@@ -17,7 +17,7 @@ jobs:
         run: rustup default stable
       
       - name: Build
-        run: build.cmd
+        run: cmd /c build.cmd
       
       - name: Upload Release
         uses: softprops/action-gh-release@v1
