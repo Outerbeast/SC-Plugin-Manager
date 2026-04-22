@@ -11,6 +11,8 @@ Sven Co-op Plugin Manager — a small Windows GUI utility to view and manage Sve
 - Download the application from the [Releases](https://github.com/Outerbeast/SC-Plugin-Manager/releases/) section
 - Launch the executable for initial setup, this will search for your Sven Co-op game install.
 
+If the initial setup is stuck at `Initial setup, please wait...`, close the app then place the executable next to your `default_plugins.txt` file (located in `Sven Co-op/svencoop/`), then run it. It will launch immediately, then afterwards you may run the app from anywhere.
+
 ## Usage
 🔍 Plugin List (Left Panel)
 - Browse available plugins: Each plugin is listed with a checkbox.
