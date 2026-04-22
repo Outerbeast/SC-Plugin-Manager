@@ -14,6 +14,13 @@ Sven Co-op Plugin Manager — a small Windows GUI utility to view and manage Sve
 If the initial setup is stuck at `Initial setup, please wait...`, close the app then place the executable next to your `default_plugins.txt` file (located in `Sven Co-op/svencoop/`), then run it. It will launch immediately, then afterwards you may run the app from anywhere.
 
 ## Usage
+
+### Quick Plugin Install
+
+You can quickly install plugins simply by dragging a `.as` plugin script file onto the executable. The plugin will be installed to `svencoop_addon/scripts/plugins/`
+
+### User Interface
+
 🔍 Plugin List (Left Panel)
 - Browse available plugins: Each plugin is listed with a checkbox.
 - Enable/Disable plugins: Toggle the checkbox to activate or deactivate a plugin.
@@ -50,11 +57,6 @@ When `X` is clicked, the app will close and any changes made will not be saved.
 - If a plugin doesn’t behave as expected, check the `Included Maps` and `Excluded Maps` fields
 
 For more detailed information on how to configure plugins, please refer to to the [official documentation](https://wiki.svencoop.com/Running_Scripts#Plugins).
-
-### Quick Plugin Install
-
-You can quickly install plugins simply by dragging a `.as` plugin script file onto the executable. The plugin will be installed to `svencoop_addon/scripts/plugins/`
-
 
 # Building from source
 
